@@ -3,3 +3,11 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+/data/raw/*
+!/data/raw/.gitkeep
+/data/processed/*
+!/data/processed/.gitkeep
+/data/trajectories/*
+!/data/trajectories/.gitkeep
+/assets/models/hand_landmarker.task
+/assets/models/hand_landmarker.task.download
