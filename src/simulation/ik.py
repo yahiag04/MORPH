@@ -71,7 +71,7 @@ def solve_position_ik(
             are invalid.
     """
     try:
-        target = np.asarray(target_xyz, dtype=np.float64)
+        target = np.array(target_xyz, dtype=np.float64, copy=True)
     except (TypeError, ValueError, OverflowError) as error:
         raise ValueError("target_xyz must contain numeric coordinates") from error
     if target.shape != (3,):

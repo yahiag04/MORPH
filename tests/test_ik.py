@@ -150,6 +150,19 @@ class IKConvergenceTests(unittest.TestCase):
         self.assertLessEqual(result.q[3], self.env.model.jnt_range[3, 1])
         self.assertTrue(np.isfinite(result.position_error))
 
+    def test_copies_target_view_before_forward_kinematics_updates_data(self):
+        target_view = self.env.data.xpos[self.env.hand_id]
+        original_target = target_view.copy()
+
+        result = solve_position_ik(self.env, target_view)
+
+        actual_error = np.linalg.norm(
+            original_target - self.env.get_end_effector_position()
+        )
+        self.assertTrue(result.converged)
+        self.assertLessEqual(actual_error, 0.015)
+        self.assertAlmostEqual(result.position_error, actual_error, places=9)
+
     def test_reports_nonconvergence_for_far_target(self):
         self.set_arm_configuration(SAFE_SEED)
 
