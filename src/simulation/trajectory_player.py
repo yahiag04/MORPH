@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+import csv
+from dataclasses import dataclass
+from pathlib import Path
+from collections.abc import Callable
+
+import mujoco
 import numpy as np
+
+from .ik import ARM_JOINT_NAMES, IKResult, solve_position_ik
+from .panda_env import PandaEnv
 
 
 def _positive_finite_scalar(name: str, value: float) -> float:
@@ -123,3 +132,199 @@ def smooth_trajectory(samples: np.ndarray, window_size: int) -> np.ndarray:
     smoothed[0] = points[0]
     smoothed[-1] = points[-1]
     return smoothed
+
+
+@dataclass(frozen=True)
+class TrajectoryLog:
+    """Samples recorded while following a Cartesian trajectory."""
+
+    timestamps: np.ndarray
+    target_xyz: np.ndarray
+    actual_xyz: np.ndarray
+    ik_converged: np.ndarray
+
+    @property
+    def position_error(self) -> np.ndarray:
+        """Return per-sample Euclidean hand-position error in meters."""
+        return np.linalg.norm(self.target_xyz - self.actual_xyz, axis=1)
+
+    def write_csv(self, output_path: str | Path) -> Path:
+        """Write target, actual, and IK status columns to ``output_path``."""
+        path = Path(output_path).expanduser()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("w", newline="", encoding="utf-8") as stream:
+                writer = csv.writer(stream)
+                writer.writerow(
+                    [
+                        "timestamp",
+                        "target_x",
+                        "target_y",
+                        "target_z",
+                        "actual_x",
+                        "actual_y",
+                        "actual_z",
+                        "ik_converged",
+                    ]
+                )
+                for timestamp, target, actual, converged in zip(
+                    self.timestamps,
+                    self.target_xyz,
+                    self.actual_xyz,
+                    self.ik_converged,
+                    strict=True,
+                ):
+                    writer.writerow(
+                        [
+                            f"{timestamp:.9f}",
+                            *(f"{coordinate:.9f}" for coordinate in target),
+                            *(f"{coordinate:.9f}" for coordinate in actual),
+                            bool(converged),
+                        ]
+                    )
+        except OSError as error:
+            raise OSError(f"Could not write trajectory CSV to '{path}': {error}") from error
+        return path
+
+
+class CartesianTrajectoryPlayer:
+    """Follow Cartesian samples using Panda IK and its joint position actuators."""
+
+    def __init__(
+        self,
+        env: PandaEnv,
+        speed: float = 0.08,
+        control_period: float = 0.02,
+        smoothing_window: int = 5,
+    ) -> None:
+        """Create a player for a loaded Panda simulation."""
+        self.env = env
+        self.speed = _positive_finite_scalar("speed", speed)
+        self.control_period = _positive_finite_scalar(
+            "control_period", control_period
+        )
+        if (
+            isinstance(smoothing_window, bool)
+            or not isinstance(smoothing_window, (int, np.integer))
+            or smoothing_window < 1
+            or smoothing_window % 2 == 0
+        ):
+            raise ValueError("smoothing_window must be a positive odd integer")
+        self.smoothing_window = int(smoothing_window)
+
+        simulation_timestep = float(env.model.opt.timestep)
+        steps = self.control_period / simulation_timestep
+        rounded_steps = int(round(steps))
+        if (
+            rounded_steps < 1
+            or not np.isclose(steps, rounded_steps, rtol=1e-8, atol=1e-9)
+        ):
+            raise ValueError(
+                "control_period must be an integer multiple of the MuJoCo timestep"
+            )
+        self.steps_per_control = rounded_steps
+        self.simulation_timestep = simulation_timestep
+        self.arm_actuator_ids = self._resolve_arm_actuators()
+
+    def _resolve_arm_actuators(self) -> np.ndarray:
+        """Resolve and validate position actuators matching Panda arm joints."""
+        actuator_ids: list[int] = []
+        for joint_name in ARM_JOINT_NAMES:
+            actuator_name = f"actuator{int(joint_name.removeprefix('joint'))}"
+            actuator_id = mujoco.mj_name2id(
+                self.env.model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_name
+            )
+            joint_id = mujoco.mj_name2id(
+                self.env.model, mujoco.mjtObj.mjOBJ_JOINT, joint_name
+            )
+            if actuator_id < 0:
+                raise ValueError(f"Panda model is missing actuator '{actuator_name}'")
+            if joint_id < 0:
+                raise ValueError(
+                    f"Panda model is missing joint '{joint_name}' for '{actuator_name}'"
+                )
+            if (
+                self.env.model.actuator_trntype[actuator_id]
+                != mujoco.mjtTrn.mjTRN_JOINT
+                or self.env.model.actuator_trnid[actuator_id, 0] != joint_id
+            ):
+                raise ValueError(
+                    f"'{actuator_name}' must actuate Panda joint '{joint_name}'"
+                )
+            if (
+                self.env.model.actuator_gaintype[actuator_id]
+                != mujoco.mjtGain.mjGAIN_FIXED
+                or self.env.model.actuator_biastype[actuator_id]
+                != mujoco.mjtBias.mjBIAS_AFFINE
+                or not np.isclose(
+                    self.env.model.actuator_gainprm[actuator_id, 0],
+                    -self.env.model.actuator_biasprm[actuator_id, 1],
+                )
+            ):
+                raise ValueError(
+                    f"'{actuator_name}' must be a position actuator for '{joint_name}'"
+                )
+            actuator_ids.append(actuator_id)
+        return np.asarray(actuator_ids, dtype=np.int32)
+
+    def follow(
+        self,
+        waypoints: np.ndarray,
+        output_csv: str | Path | None = None,
+        on_control_step: Callable[[], None] | None = None,
+    ) -> TrajectoryLog:
+        """Run a Cartesian path and return per-simulation-step measurements.
+
+        Args:
+            waypoints: Finite XYZ path in world coordinates.
+            output_csv: Optional path for a CSV log.
+            on_control_step: Optional callback after each control interval.
+
+        Returns:
+            The recorded simulation timestamps, targets, actual XYZ, and IK
+            convergence flags.
+        """
+        sample_times, samples = resample_waypoints(
+            waypoints, self.speed, self.control_period
+        )
+        targets = smooth_trajectory(samples, self.smoothing_window)
+        timestamps: list[float] = []
+        target_rows: list[np.ndarray] = []
+        actual_rows: list[np.ndarray] = []
+        convergence_rows: list[bool] = []
+
+        for index, target in enumerate(targets):
+            qpos_before_ik = self.env.data.qpos.copy()
+            result: IKResult = solve_position_ik(self.env, target)
+            joint_target = result.q.copy()
+            self.env.data.qpos[:] = qpos_before_ik
+            mujoco.mj_forward(self.env.model, self.env.data)
+            self.env.data.ctrl[self.arm_actuator_ids] = joint_target
+
+            if index + 1 < sample_times.size:
+                interval = sample_times[index + 1] - sample_times[index]
+                step_count = max(
+                    1, int(round(interval / self.simulation_timestep))
+                )
+            else:
+                step_count = self.steps_per_control
+
+            for _ in range(step_count):
+                self.env.step()
+                timestamps.append(float(self.env.data.time))
+                target_rows.append(target.copy())
+                actual_rows.append(self.env.get_end_effector_position())
+                convergence_rows.append(result.converged)
+
+            if on_control_step is not None:
+                on_control_step()
+
+        log = TrajectoryLog(
+            timestamps=np.asarray(timestamps, dtype=np.float64),
+            target_xyz=np.asarray(target_rows, dtype=np.float64),
+            actual_xyz=np.asarray(actual_rows, dtype=np.float64),
+            ik_converged=np.asarray(convergence_rows, dtype=np.bool_),
+        )
+        if output_csv is not None:
+            log.write_csv(output_csv)
+        return log
