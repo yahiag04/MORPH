@@ -20,7 +20,7 @@ class PandaEnv:
 
         Args:
             model_path: MuJoCo XML scene path. Defaults to the local Menagerie
-                Panda scene documented in ``AGENT_TASK.md``.
+                Panda scene.
 
         Raises:
             FileNotFoundError: If the scene path does not exist.
