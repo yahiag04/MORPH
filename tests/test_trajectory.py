@@ -96,6 +96,22 @@ class ResampleWaypointsTests(unittest.TestCase):
                 np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]), 0.1, 0.02
             )
 
+    def test_preserves_both_endpoints_for_extremely_short_path(self):
+        waypoints = np.array([[0.0, 0.0, 0.0], [1e-14, 0.0, 0.0]])
+
+        times, samples = resample_waypoints(waypoints, speed=1.0, sample_period=0.02)
+
+        np.testing.assert_array_equal(times, [0.0, 1e-14])
+        np.testing.assert_array_equal(samples, waypoints)
+
+    def test_collapses_numerically_duplicate_final_sample(self):
+        waypoints = np.array([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.1 + 0.2, 0.0, 0.0]])
+
+        times, _ = resample_waypoints(waypoints, speed=1.0, sample_period=0.02)
+
+        self.assertEqual(times[-1], 0.1 + 0.2)
+        self.assertGreater(np.diff(times).min(), 1e-12)
+
     def test_rejects_nonpositive_speed_or_sample_period(self):
         path = np.array([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]])
         for speed, period in ((0.0, 0.02), (0.1, 0.0), (0.1, -0.02)):
@@ -161,6 +177,13 @@ class CartesianTrajectoryPlayerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "actuator1"):
             CartesianTrajectoryPlayer(env)
 
+    def test_rejects_position_actuator_with_nonunit_gear(self):
+        env = PandaEnv()
+        env.model.actuator_gear[0, 0] = 2.0
+
+        with self.assertRaisesRegex(ValueError, "gear"):
+            CartesianTrajectoryPlayer(env)
+
     def test_follows_cartesian_curve_and_writes_physics_log(self):
         env = PandaEnv()
         waypoints = []
@@ -193,6 +216,10 @@ class CartesianTrajectoryPlayerTests(unittest.TestCase):
         self.assertTrue(np.isfinite(log.target_xyz).all())
         self.assertTrue(np.isfinite(log.actual_xyz).all())
         self.assertTrue(np.all(np.diff(log.timestamps) > 0.0))
+        mujoco.mj_forward(env.model, env.data)
+        np.testing.assert_allclose(
+            log.actual_xyz[-1], env.get_end_effector_position(), atol=1e-12
+        )
         self.assertLess(
             np.linalg.norm(log.target_xyz[-1] - log.actual_xyz[-1]), 0.05
         )

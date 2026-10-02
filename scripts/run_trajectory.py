@@ -52,7 +52,10 @@ def main() -> None:
     print(f"Figure: {figure_path}")
     print(f"Mean position error: {log.position_error.mean():.6f} m")
     print(f"Maximum position error: {log.position_error.max():.6f} m")
-    print(f"IK failures: {np.count_nonzero(~log.ik_converged)}")
+    print(
+        "Simulation samples with unconverged IK: "
+        f"{np.count_nonzero(~log.ik_converged)}"
+    )
 
 
 if __name__ == "__main__":

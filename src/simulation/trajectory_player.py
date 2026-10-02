@@ -79,10 +79,15 @@ def resample_waypoints(
     timestamps = np.arange(0.0, duration, sample_period, dtype=np.float64)
     if timestamps.size == 0:
         timestamps = np.array([0.0], dtype=np.float64)
-    if duration - timestamps[-1] > 1e-12:
-        timestamps = np.append(timestamps, duration)
-    else:
+    endpoint_roundoff = (
+        16.0
+        * np.finfo(np.float64).eps
+        * max(duration, sample_period)
+    )
+    if timestamps.size > 1 and duration - timestamps[-1] <= endpoint_roundoff:
         timestamps[-1] = duration
+    elif timestamps[-1] != duration:
+        timestamps = np.append(timestamps, duration)
 
     distances = np.minimum(speed * timestamps, total_distance)
     cumulative_distance = np.concatenate(
@@ -154,7 +159,7 @@ class TrajectoryLog:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", newline="", encoding="utf-8") as stream:
-                writer = csv.writer(stream)
+                writer = csv.writer(stream, lineterminator="\n")
                 writer.writerow(
                     [
                         "timestamp",
@@ -264,6 +269,10 @@ class CartesianTrajectoryPlayer:
                 raise ValueError(
                     f"'{actuator_name}' must be a position actuator for '{joint_name}'"
                 )
+            if not np.isclose(self.env.model.actuator_gear[actuator_id, 0], 1.0):
+                raise ValueError(
+                    f"'{actuator_name}' must use unit gear for joint-radian targets"
+                )
             actuator_ids.append(actuator_id)
         return np.asarray(actuator_ids, dtype=np.int32)
 
@@ -311,6 +320,7 @@ class CartesianTrajectoryPlayer:
 
             for _ in range(step_count):
                 self.env.step()
+                mujoco.mj_forward(self.env.model, self.env.data)
                 timestamps.append(float(self.env.data.time))
                 target_rows.append(target.copy())
                 actual_rows.append(self.env.get_end_effector_position())
