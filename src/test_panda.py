@@ -3,31 +3,36 @@ import numpy as np
 import mujoco
 import mujoco.viewer
 
-MODEL_PATH = "/Users/yahiaghallale/Documents/mujoco_menagerie/franka_emika_panda/scene.xml"
+from simulation.panda_env import PandaEnv
 
-model = mujoco.MjModel.from_xml_path(MODEL_PATH)
-data = mujoco.MjData(model)
+env = PandaEnv()
 
-print("Number of joints:", model.njnt)
-print("Number of actuators:", model.nu)
+print("Number of joints:", env.model.njnt)
+print("Number of actuators:", env.model.nu)
 print("Actuators:")
 
-for i in range(model.nu):
-    print(i, mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i))
+for i in range(env.model.nu):
+    print(i, mujoco.mj_id2name(env.model, mujoco.mjtObj.mjOBJ_ACTUATOR, i))
 
-with mujoco.viewer.launch_passive(model, data) as viewer:
+with mujoco.viewer.launch_passive(env.model, env.data) as viewer:
 
     start = time.time()
+    last_position_print = -0.5
 
     while viewer.is_running():
 
         t = time.time() - start
 
         # Move joint 1 sinusoidally
-        data.ctrl[0] = 0.4 * np.sin(t)
+        env.data.ctrl[0] = 0.4 * np.sin(t)
 
-        mujoco.mj_step(model, data)
+        env.step()
+
+        if t - last_position_print >= 0.5:
+            position = env.get_end_effector_position()
+            print(f"Hand XYZ: {position.round(4).tolist()}", flush=True)
+            last_position_print = t
 
         viewer.sync()
 
-        time.sleep(model.opt.timestep)
+        time.sleep(env.model.opt.timestep)
