@@ -1,0 +1,23 @@
+{
+  "success": true,
+  "object_lifted": true,
+  "object_placed": true,
+  "initial_cube_xyz_m": [
+    0.55,
+    0.15,
+    0.425
+  ],
+  "max_cube_z_m": 0.5899854153843178,
+  "final_cube_xyz_m": [
+    0.5569069384590193,
+    -0.1682671409716923,
+    0.4248744429370326
+  ],
+  "target_center_xyz_m": [
+    0.55,
+    -0.15,
+    0.425
+  ],
+  "trajectory_samples": 7592,
+  "ik_unconverged_samples": 0
+}

@@ -83,17 +83,31 @@ class ManipulationEnv(PandaEnv):
         )
 
         super().__init__(model=spec.compile())
-        self.cube_body_id = self._named_id(mujoco.mjtObj.mjOBJ_BODY, "cube")
-        self.target_geom_id = self._named_id(mujoco.mjtObj.mjOBJ_GEOM, "target_region")
-        self.table_geom_id = self._named_id(mujoco.mjtObj.mjOBJ_GEOM, "table_surface")
-        self.gripper_actuator_id = self._named_id(
-            mujoco.mjtObj.mjOBJ_ACTUATOR, "actuator8"
+        self.cube_body_id = self._required_id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "cube"
+        )
+        self.cube_geom_id = self._required_id(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, "cube_geom"
+        )
+        self.target_geom_id = self._required_id(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, "target_region"
+        )
+        self.table_geom_id = self._required_id(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, "table_surface"
+        )
+        self.gripper_actuator_id = self._required_id(
+            self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "actuator8"
         )
 
-    def _named_id(self, object_type: mujoco.mjtObj, name: str) -> int:
-        identifier = mujoco.mj_name2id(self.model, object_type, name)
+    @staticmethod
+    def _required_id(
+        model: mujoco.MjModel, object_type: mujoco.mjtObj, name: str
+    ) -> int:
+        """Resolve a required named element with a model-specific message."""
+        identifier = mujoco.mj_name2id(model, object_type, name)
         if identifier < 0:
-            raise ValueError(f"Manipulation model is missing '{name}'")
+            role = "gripper " if name == "actuator8" else ""
+            raise ValueError(f"Manipulation model is missing {role}element '{name}'")
         return identifier
 
     def get_cube_position(self) -> np.ndarray:
@@ -107,6 +121,38 @@ class ManipulationEnv(PandaEnv):
             raise ValueError("xyz must contain three finite coordinates")
         half_width = self.config.target_half_size_xy
         return bool(np.all(np.abs(point[:2] - self.config.target_xyz[:2]) <= half_width))
+
+    def is_cube_stably_on_table(
+        self,
+        *,
+        max_linear_speed: float = 0.02,
+        max_angular_speed: float = 0.5,
+    ) -> bool:
+        """Require real table contact and low translational/angular velocity."""
+        if not self.cube_has_table_contact():
+            return False
+        velocity = np.zeros(6, dtype=np.float64)
+        mujoco.mj_objectVelocity(
+            self.model,
+            self.data,
+            mujoco.mjtObj.mjOBJ_BODY,
+            self.cube_body_id,
+            velocity,
+            0,
+        )
+        return bool(
+            np.linalg.norm(velocity[3:]) <= max_linear_speed
+            and np.linalg.norm(velocity[:3]) <= max_angular_speed
+        )
+
+    def cube_has_table_contact(self) -> bool:
+        """Return whether a current MuJoCo contact supports the cube on the table."""
+        return any(
+            {int(contact.geom1), int(contact.geom2)}
+            == {self.cube_geom_id, self.table_geom_id}
+            and contact.dist <= 0.001
+            for contact in self.data.contact[: self.data.ncon]
+        )
 
     def open_gripper(self) -> None:
         """Command the Panda gripper to its maximum actuator setting."""
