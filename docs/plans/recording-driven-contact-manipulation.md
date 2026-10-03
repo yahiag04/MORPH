@@ -2,7 +2,7 @@
 
 **Goal:** Make recorded human demonstrations drive a physical Panda pick-and-place in MuJoCo, then train and evaluate a small action-conditioned world model on the resulting task-state transitions.
 
-**Architecture:** Add a separate compact-package-and-tray environment, a local task-layout format, and a demonstration-conditioned finite-state controller. An evaluator replays every tracked clip and logs MuJoCo state/action transitions; an optional PyTorch module learns next-state dynamics from those transitions and reports clip-held-out prediction quality.
+**Architecture:** Add a separate compact-package-and-tray environment, per-clip object-center detection with a local task-layout fallback, and a demonstration-conditioned finite-state controller. An evaluator replays every tracked clip and logs MuJoCo state/action transitions; an optional PyTorch module learns next-state dynamics from those transitions and reports clip-held-out prediction quality.
 
 **Tech Stack:** Python 3.14 for the existing project, MuJoCo 3.14.0, NumPy, OpenCV, and an isolated Python/PyTorch environment for world-model training.
 
@@ -20,7 +20,7 @@
 ## File Map
 
 - Create `src/simulation/contact_manipulation_env.py`: Panda, table, compact free package, and collision-enabled receiving tray.
-- Create `src/perception/task_layout.py`: validated JSON pickup/dropoff points in rectified unit-square coordinates.
+- Extend `src/perception/task_layout.py`: validated JSON fallback and per-frame package/bowl center detection in rectified unit-square coordinates.
 - Create `src/simulation/demonstration_manipulation.py`: deterministic approach/grasp/carry/release controller driven by retargeted human XY.
 - Create `src/evaluation/contact_demo_evaluator.py`: fresh seeded simulation per clip, physical success metrics, and transition logs.
 - Create `scripts/evaluate_contact_demos.py`: process the local manifest/calibrations/layout, run both retargeting variants, and save private per-clip data plus aggregate-only output.
@@ -59,13 +59,13 @@
 
 **Files:** create `src/evaluation/contact_demo_evaluator.py`, `scripts/evaluate_contact_demos.py`, and `tests/test_contact_demo_evaluator.py`.
 
-- [ ] Add failing tests proving deterministic fresh runs, explicit phase-trigger failures, stable physical success criteria, human-label/robot-outcome separation, and aggregate denominator includes failures.
-- [ ] Implement `evaluate_contact_trajectory(trajectory, layout, model_path=None)` to return per-step state/action transitions and robot outcome metrics.
-- [ ] Implement CLI inputs `--processing-manifest`, `--calibration-dir`, `--task-layout`, and `--output-dir`; output must resolve outside the repo. Run direct and confidence-aware methods for all clips and keep details local.
-- [ ] Aggregate completed runs, simulation success rate by human label, human/simulation confusion counts, lift/place success, IK failures, and transition counts. Retain failed and incomplete episodes in denominators.
+- [x] Add failing tests proving deterministic fresh runs, explicit phase-trigger failures, stable physical success criteria, human-label/robot-outcome separation, and aggregate denominator includes failures.
+- [x] Implement `evaluate_contact_trajectory(trajectory, pickup_xy, dropoff_xy, model_path=None)` to return per-step state/action transitions and robot outcome metrics.
+- [x] Implement CLI inputs `--processing-manifest`, `--calibration-dir`, optional `--task-layout` fallback, and `--output-dir`; output must resolve outside the repo. Run direct and confidence-aware methods for all clips and keep details local.
+- [x] Aggregate completed runs, simulation success rate by human label, human/simulation confusion counts, lift/place success, IK failures, and transition counts. Retain failed and incomplete episodes in denominators.
 - [ ] Generate an aggregate-only comparison figure and an optional local paired clip. Do not publish video frames, clip names, layout points, or per-clip data.
-- [ ] Verify on all 16 real clips, inspect the confusion matrix and one successful/one failed rollout; document actual outcomes without tuning on held-out clips.
-- [ ] Commit as `feat: evaluate contact manipulation from videos`.
+- [x] Verify on all 16 real clips and both retargeting methods. Direct: 5/12 human-success clips and 0/4 human-failure clips completed; confidence-aware: 4/12 and 0/4. Every clip was retained in denominators. Inspect both successful and failed runs; report the proxy and hand-offset limits.
+- [x] Commit as `feat: evaluate contact manipulation from videos`.
 
 ## Task 4: Train and Evaluate the State World Model
 

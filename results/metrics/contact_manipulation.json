@@ -1,0 +1,97 @@
+{
+  "dataset": {
+    "clips": 16,
+    "human_label_counts": {
+      "falliti": 4,
+      "riusciti": 12
+    }
+  },
+  "methods": {
+    "direct": {
+      "episodes": 16,
+      "robot_successes": 5,
+      "robot_success_rate": 0.3125,
+      "human_label_counts": {
+        "falliti": 4,
+        "riusciti": 12
+      },
+      "by_human_label": {
+        "falliti": {
+          "episodes": 4,
+          "robot_successes": 0,
+          "robot_failures": 4,
+          "robot_success_rate": 0.0
+        },
+        "riusciti": {
+          "episodes": 12,
+          "robot_successes": 5,
+          "robot_failures": 7,
+          "robot_success_rate": 0.4166666666666667
+        }
+      },
+      "confusion": {
+        "human_success_robot_success": 5,
+        "human_success_robot_failure": 7,
+        "human_failure_robot_success": 0,
+        "human_failure_robot_failure": 4
+      },
+      "failure_reasons": {
+        "dropoff_trigger_not_reached": 5,
+        "package_not_lifted": 1,
+        "package_not_stably_placed_in_tray": 4,
+        "pickup_trigger_not_reached": 1
+      },
+      "mean_max_lift_m": 0.14437028823160614,
+      "mean_transition_count": 191.875,
+      "state_dim": 19,
+      "action_dim": 4,
+      "retargeting_method": "direct"
+    },
+    "confidence-aware": {
+      "episodes": 16,
+      "robot_successes": 4,
+      "robot_success_rate": 0.25,
+      "human_label_counts": {
+        "falliti": 4,
+        "riusciti": 12
+      },
+      "by_human_label": {
+        "falliti": {
+          "episodes": 4,
+          "robot_successes": 0,
+          "robot_failures": 4,
+          "robot_success_rate": 0.0
+        },
+        "riusciti": {
+          "episodes": 12,
+          "robot_successes": 4,
+          "robot_failures": 8,
+          "robot_success_rate": 0.3333333333333333
+        }
+      },
+      "confusion": {
+        "human_success_robot_success": 4,
+        "human_success_robot_failure": 8,
+        "human_failure_robot_success": 0,
+        "human_failure_robot_failure": 4
+      },
+      "failure_reasons": {
+        "dropoff_trigger_not_reached": 5,
+        "package_not_lifted": 1,
+        "package_not_stably_placed_in_tray": 5,
+        "pickup_trigger_not_reached": 1
+      },
+      "mean_max_lift_m": 0.1443938025488189,
+      "mean_transition_count": 191.8125,
+      "state_dim": 19,
+      "action_dim": 4,
+      "retargeting_method": "confidence-aware"
+    }
+  },
+  "task_layout_source_counts": {
+    "detected": 16,
+    "fallback": 0,
+    "unavailable": 0
+  },
+  "simulation_proxy": "MuJoCo rigid box and shallow tray; not physical robot validation"
+}

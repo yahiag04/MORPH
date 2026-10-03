@@ -8,7 +8,7 @@ import mujoco
 import numpy as np
 
 from .contact_manipulation_env import ContactManipulationEnv
-from .ik import solve_position_ik
+from .ik import solve_pose_ik, solve_position_ik
 
 
 def run_demonstration_manipulation(
@@ -21,12 +21,14 @@ def run_demonstration_manipulation(
     radii: dict[str, float] | None = None,
     on_control_step: Callable[[dict], None] | None = None,
     simulation_steps_per_sample: int = 10,
+    cartesian_speed_mps: float = 0.08,
 ) -> dict:
     """Replay timestamped Cartesian samples with inferred grasp/place phases.
 
     ``timed_xy`` has columns ``timestamp,x,y,z``. The recording determines XY;
     grasp heights and trigger radii are explicit assumptions for overhead video.
-    Object motion always comes from MuJoCo contacts.
+    Arm targets are interpolated and followed by Panda position actuators; the
+    object remains a free body and moves only through MuJoCo contact dynamics.
     """
     path = np.asarray(timed_xy, dtype=np.float64)
     pickup = np.asarray(pickup_xy, dtype=np.float64)
@@ -39,61 +41,127 @@ def run_demonstration_manipulation(
         raise ValueError("pickup_xy and dropoff_xy must be finite XY points")
     if simulation_steps_per_sample < 1:
         raise ValueError("simulation_steps_per_sample must be positive")
-    heights = heights or {"approach": 0.52, "grasp": env.config.table_surface_z + 0.035,
-                          "carry": 0.56, "release": env.config.table_surface_z + 0.035}
+    if not np.isfinite(cartesian_speed_mps) or cartesian_speed_mps <= 0:
+        raise ValueError("cartesian_speed_mps must be finite and positive")
+
+    heights = heights or {"approach": 0.62, "grasp": env.config.table_surface_z + 0.12,
+                          "carry": 0.70, "release": env.config.table_surface_z + 0.12}
     radii = radii or {"pickup": 0.06, "dropoff": 0.08}
     phase = "approach"
     gripper_command = "open"
     initial_package_z = float(env.get_package_position()[2])
     max_lift = 0.0
+    package_ee_offset: np.ndarray | None = None
+    grasp_orientation: np.ndarray | None = None
     logs: list[dict] = []
     failure = None
     saw_pickup = False
     saw_dropoff = False
+    last_human_timestamp = float(path[0, 0])
 
-    for timestamp, x, y, recorded_z in path:
-        point_xy = np.array((x, y))
+    def command_arm(target_xyz: np.ndarray, orientation: np.ndarray | None = None) -> tuple[bool, float]:
+        qpos_before_ik = env.data.qpos.copy()
+        ik = (solve_pose_ik(env, target_xyz, orientation, position_tolerance=0.005,
+                            orientation_tolerance=0.04, max_iterations=400)
+              if orientation is not None else
+              solve_position_ik(env, target_xyz, tolerance=0.005, max_iterations=400))
+        arm_target = ik.q.copy()
+        env.data.qpos[:] = qpos_before_ik
+        mujoco.mj_forward(env.model, env.data)
+        for index in range(7):
+            actuator_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"actuator{index + 1}")
+            env.data.ctrl[actuator_id] = arm_target[index]
+        return bool(ik.converged), float(ik.position_error)
+
+    def control_to(target_xyz: np.ndarray, control_phase: str, command: str, timestamp: float) -> None:
+        nonlocal max_lift, failure, package_ee_offset
+        start = env.get_end_effector_position()
+        distance = float(np.linalg.norm(target_xyz - start))
+        control_dt = float(env.model.opt.timestep) * simulation_steps_per_sample
+        intervals = max(1, int(np.ceil(distance / (cartesian_speed_mps * control_dt))))
+        env.close_gripper() if command == "close" else env.open_gripper()
+        for index in range(1, intervals + 1):
+            interpolated = start + (target_xyz - start) * (index / intervals)
+            converged, ik_error = command_arm(interpolated)
+            if not converged and failure is None:
+                failure = "ik_not_converged"
+            for _ in range(simulation_steps_per_sample):
+                env.step()
+                current_package = env.get_package_position()
+                current_z = float(current_package[2])
+                max_lift = max(max_lift, current_z - initial_package_z)
+                if package_ee_offset is None and current_z - initial_package_z >= 0.05:
+                    package_ee_offset = current_package[:2] - env.get_end_effector_position()[:2]
+            log = {
+                "timestamp": timestamp + index * control_dt,
+                "phase": control_phase,
+                "target_xyz": interpolated.copy(),
+                "actual_xyz": env.get_end_effector_position().copy(),
+                "gripper_command": command,
+                "package_xyz": env.get_package_position(),
+                "package_linear_velocity": env.get_package_linear_velocity(),
+                "package_gripper_contact": env.package_has_gripper_contact(),
+                "package_support_contact": env.package_has_support_contact(),
+                "ik_converged": converged,
+                "ik_error_m": ik_error,
+            }
+            logs.append(log)
+            if on_control_step is not None:
+                on_control_step(log)
+
+    def object_target(xy: np.ndarray, z: float) -> np.ndarray:
+        target = np.array((xy[0], xy[1], z), dtype=np.float64)
+        target[:2] -= np.asarray(env.config.gripper_center_offset_xy, dtype=np.float64)
+        return target
+
+    for timestamp, x, y, _recorded_z in path:
+        point_xy = np.array((x, y), dtype=np.float64)
         if phase == "approach" and np.linalg.norm(point_xy - pickup) <= radii["pickup"]:
-            phase, gripper_command, saw_pickup = "grasp", "close", True
-        elif phase == "carry" and np.linalg.norm(point_xy - dropoff) <= radii["dropoff"]:
-            phase, gripper_command, saw_dropoff = "release", "open", True
-
-        if phase == "approach":
-            target = np.array((x, y, heights["approach"]))
-        elif phase == "grasp":
-            target = np.array((pickup[0], pickup[1], heights["grasp"]))
-        elif phase == "carry":
-            target = np.array((x, y, heights["carry"]))
-        elif phase == "release":
-            target = np.array((dropoff[0], dropoff[1], heights["release"]))
-        else:
-            target = np.array((x, y, heights["approach"]))
-
-        ik = solve_position_ik(env, target)
-        env.close_gripper() if gripper_command == "close" else env.open_gripper()
-        if not ik.converged and failure is None:
-            failure = "ik_not_converged"
-        for _ in range(simulation_steps_per_sample):
-            env.step()
-            current_z = float(env.get_package_position()[2])
-            max_lift = max(max_lift, current_z - initial_package_z)
-        log = {
-            "timestamp": float(timestamp), "phase": phase, "target_xyz": target.copy(),
-            "actual_xyz": env.get_end_effector_position().copy(), "gripper_command": gripper_command,
-            "package_xyz": env.get_package_position(), "package_linear_velocity": env.get_package_linear_velocity(),
-            "package_gripper_contact": env.package_has_gripper_contact(),
-            "package_support_contact": env.package_has_support_contact(),
-            "ik_converged": bool(ik.converged), "ik_error_m": float(ik.position_error),
-        }
-        logs.append(log)
-        if on_control_step is not None:
-            on_control_step(log)
-        if phase == "grasp":
+            saw_pickup = True
+            phase = "grasp"
+            pickup_approach = object_target(pickup, heights["approach"])
+            control_to(pickup_approach, "approach", "open", float(timestamp))
+            grasp_target = object_target(pickup, heights["grasp"])
+            control_to(grasp_target, "grasp", "open", float(timestamp))
+            for _ in range(3):
+                control_to(grasp_target, "grasp", "close", float(timestamp))
+            grasp_orientation = env.data.xquat[env.hand_id].copy()
             phase = "carry"
-        elif phase == "release":
+            # Lift straight up before following the recorded lateral path.
+            control_to(object_target(pickup, heights["carry"]), "carry", "close", float(timestamp))
+            last_human_timestamp = float(timestamp)
+            continue
+
+        if phase == "carry" and np.linalg.norm(point_xy - dropoff) <= radii["dropoff"]:
+            saw_dropoff = True
+            phase = "release"
+            if env.get_package_position()[2] > initial_package_z + 0.02:
+                package_ee_offset = env.get_package_position()[:2] - env.get_end_effector_position()[:2]
+            if package_ee_offset is None:
+                release_xy = dropoff - np.asarray(env.config.gripper_center_offset_xy, dtype=np.float64)
+            else:
+                release_xy = dropoff - package_ee_offset
+            release_target = np.array((release_xy[0], release_xy[1], heights["release"]), dtype=np.float64)
+            control_to(release_target, "release", "open", float(timestamp))
+            for _ in range(max(10, int(round(0.4 / (env.model.opt.timestep * simulation_steps_per_sample))))):
+                for _ in range(simulation_steps_per_sample):
+                    env.step()
+                    max_lift = max(max_lift, float(env.get_package_position()[2]) - initial_package_z)
             phase = "complete"
             break
 
+        if phase == "approach":
+            target = np.array((x, y, heights["approach"]), dtype=np.float64)
+            command = "open"
+        elif phase == "carry":
+            target = np.array((x, y, heights["carry"]), dtype=np.float64)
+            command = "close"
+        else:
+            break
+        control_to(target, phase, command, float(timestamp))
+        last_human_timestamp = float(timestamp)
+
+    settled = env.is_package_stable_on_support() and env.is_inside_tray()
     if not saw_pickup:
         failure = "pickup_trigger_not_reached"
     elif not saw_dropoff:
@@ -102,7 +170,11 @@ def run_demonstration_manipulation(
         failure = "episode_incomplete"
     elif any(not row["ik_converged"] for row in logs):
         failure = "ik_not_converged"
-    settled = env.is_package_stable_on_support() and env.is_inside_tray()
+    elif max_lift < 0.05:
+        failure = "package_not_lifted"
+    elif not settled:
+        failure = "package_not_stably_placed_in_tray"
+
     success = bool(failure is None and max_lift >= 0.05 and settled)
     return {
         "phase": phase, "success": success, "failure_reason": failure,

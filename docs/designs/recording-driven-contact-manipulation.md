@@ -8,7 +8,7 @@ Upgrade MORPH's human-video replay so personally recorded demonstrations control
 
 - Use the existing 16 locally collected overhead videos: 12 human-labeled successful attempts and 4 failed attempts.
 - Retain MediaPipe palm tracking and per-video workspace marker calibration. The recorded XY hand path must determine the Panda's motion.
-- Add inferred manipulation phases because monocular overhead video has no metric Z and no gripper-state labels.
+- Add inferred manipulation phases because monocular overhead video has no metric Z and no gripper-state labels. Detect the card and bowl centers independently in each clip because their positions vary between recordings; allow a local normalized layout JSON as an explicit fallback.
 - Model a compact package as a rigid rectangular box and the bowl as a shallow, open receiving tray. Make clear these are simulation proxies.
 - Use MuJoCo contact dynamics. Never teleport, weld, or kinematically attach the object to the gripper.
 - Define robot success from object lift, release inside the receiving region, stable table/tray contact, and converged IK.
@@ -20,11 +20,11 @@ Upgrade MORPH's human-video replay so personally recorded demonstrations control
 
 ### Task layout
 
-Add a small local JSON layout that stores pickup and dropoff points in the normalized, rectified workspace coordinate system. One layout is shared across this fixed-camera recording batch. The evaluator transforms these points through each clip's own calibration and configures the package start position and tray center. The JSON is supplied by the user and is never written into the repository by a processing command.
+Detect the navy package and wood-toned bowl in an early tracked-video frame, then rectify both centers through that clip's calibration. A local JSON layout in normalized rectified coordinates remains available as a fallback. Per-clip coordinates and layout previews stay outside Git.
 
 ### Demonstration-conditioned controller
 
-Retarget the tracked palm CSV to calibrated workspace XY and preserve its timestamps. Follow the observed XY path at an approach height. When the end effector enters the configured pickup radius, descend to grasp height, close the Panda gripper, and lift. Continue following the recorded XY path at carry height. When it enters the dropoff radius, descend, open the gripper, and retreat. A clip that never triggers a phase remains an unsuccessful robot attempt; do not synthesize a missing human action.
+Retarget the tracked palm CSV to calibrated workspace XY and preserve its timestamps. Follow the observed XY path at a 0.62 m approach height. When the end effector enters the configured pickup radius, descend to 0.52 m, close the Panda gripper after alignment, and lift vertically to 0.70 m. Continue following the recorded XY path at carry height. When it enters the 0.08 m dropoff radius, descend, open the gripper, and retreat. Use position-only IK with the Panda position actuators; the package remains a free body. A clip that never triggers a phase remains an unsuccessful robot attempt; do not synthesize a missing human action. Current pickup and dropoff trigger radii are 0.06 m and 0.08 m.
 
 Use explicit configurable heights and radii with conservative defaults. The controller logs state transitions, gripper commands, object pose, table/tray contacts, and IK convergence. Each clip gets a fresh simulation initialized from the same seed.
 

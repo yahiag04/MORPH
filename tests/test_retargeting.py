@@ -38,8 +38,8 @@ class RetargetingTests(unittest.TestCase):
             source, output = root / "tracked.csv", root / "robot.csv"
             write_tracked(source, [(0.2, 0.15, 0.9), (0.8, 0.85, 0.9)])
             trajectory = map_hand_trajectory(source, output, smoothing_window=1, max_speed=10)
-            np.testing.assert_allclose(trajectory[0, 1:], [0.38, 0.22, 0.62])
-            np.testing.assert_allclose(trajectory[1, 1:], [0.68, -0.22, 0.62])
+            np.testing.assert_allclose(trajectory[0, 1:], [0.38, -0.22, 0.62])
+            np.testing.assert_allclose(trajectory[1, 1:], [0.68, 0.22, 0.62])
             self.assertTrue(output.is_file())
 
     def test_interpolates_single_missing_sample_and_caps_velocity(self):
@@ -83,7 +83,7 @@ class RetargetingTests(unittest.TestCase):
                 )
             except TypeError as error:
                 self.fail(f"map_hand_trajectory must accept per-video corners: {error}")
-            expected = ((0.38, 0.22, 0.62), (0.68, 0.22, 0.62), (0.68, -0.22, 0.62), (0.38, -0.22, 0.62))
+            expected = ((0.38, -0.22, 0.62), (0.68, -0.22, 0.62), (0.68, 0.22, 0.62), (0.38, 0.22, 0.62))
             np.testing.assert_allclose(trajectory[:, 1:], expected, atol=1e-5)
 
     def test_confidence_weighted_smoothing_downweights_low_score_outlier(self):

@@ -157,3 +157,81 @@ def solve_position_ik(
         position_error=final_error,
         iterations=iterations,
     )
+
+
+def solve_pose_ik(
+    env: PandaEnv,
+    target_xyz: np.ndarray,
+    target_quat: np.ndarray,
+    *,
+    position_tolerance: float = 0.005,
+    orientation_tolerance: float = 0.04,
+    max_iterations: int = 300,
+    damping: float = 0.08,
+    step_size: float = 0.5,
+) -> IKResult:
+    """Solve Panda hand position and orientation with damped least squares."""
+    target = np.asarray(target_xyz, dtype=np.float64)
+    quat = np.asarray(target_quat, dtype=np.float64)
+    if target.shape != (3,) or not np.isfinite(target).all():
+        raise ValueError("target_xyz must contain three finite coordinates")
+    if quat.shape != (4,) or not np.isfinite(quat).all() or np.linalg.norm(quat) < 1e-8:
+        raise ValueError("target_quat must be a finite nonzero quaternion")
+    quat = quat / np.linalg.norm(quat)
+    position_tolerance = _finite_scalar("position_tolerance", position_tolerance)
+    orientation_tolerance = _finite_scalar("orientation_tolerance", orientation_tolerance)
+    damping = _finite_scalar("damping", damping)
+    step_size = _finite_scalar("step_size", step_size)
+    if position_tolerance <= 0 or orientation_tolerance <= 0 or damping <= 0:
+        raise ValueError("pose tolerances and damping must be positive")
+    if not 0 < step_size <= 1:
+        raise ValueError("step_size must be in (0, 1]")
+    if isinstance(max_iterations, bool) or not isinstance(max_iterations, (int, np.integer)) or max_iterations <= 0:
+        raise ValueError("max_iterations must be a positive integer")
+
+    joint_ids: list[int] = []
+    for name in ARM_JOINT_NAMES:
+        identifier = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_JOINT, name)
+        if identifier < 0 or env.model.jnt_type[identifier] != mujoco.mjtJoint.mjJNT_HINGE:
+            raise ValueError(f"Panda model is missing valid arm joint '{name}'")
+        joint_ids.append(identifier)
+    qpos_addresses = env.model.jnt_qposadr[joint_ids]
+    dof_addresses = env.model.jnt_dofadr[joint_ids]
+    limits = env.model.jnt_range[joint_ids]
+    q = np.clip(env.data.qpos[qpos_addresses].copy(), limits[:, 0], limits[:, 1])
+    env.data.qpos[qpos_addresses] = q
+    jacp = np.zeros((3, env.model.nv), dtype=np.float64)
+    jacr = np.zeros((3, env.model.nv), dtype=np.float64)
+    iterations = 0
+    position_error = np.inf
+    orientation_error = np.inf
+    identity = np.eye(6, dtype=np.float64)
+
+    for _ in range(int(max_iterations)):
+        mujoco.mj_forward(env.model, env.data)
+        position_residual = target - env.data.xpos[env.hand_id]
+        quaternion_residual = np.zeros(3, dtype=np.float64)
+        mujoco.mju_subQuat(quaternion_residual, quat, env.data.xquat[env.hand_id])
+        quaternion_residual = env.data.xmat[env.hand_id].reshape(3, 3) @ quaternion_residual
+        position_error = float(np.linalg.norm(position_residual))
+        orientation_error = float(np.linalg.norm(quaternion_residual))
+        if position_error <= position_tolerance and orientation_error <= orientation_tolerance:
+            break
+        mujoco.mj_jacBody(env.model, env.data, jacp, jacr, env.hand_id)
+        jacobian = np.vstack((jacp[:, dof_addresses], jacr[:, dof_addresses]))
+        residual = np.concatenate((position_residual, quaternion_residual))
+        normal = jacobian @ jacobian.T + damping**2 * identity
+        delta = jacobian.T @ np.linalg.solve(normal, residual)
+        q = np.clip(q + step_size * delta, limits[:, 0], limits[:, 1])
+        env.data.qpos[qpos_addresses] = q
+        iterations += 1
+
+    mujoco.mj_forward(env.model, env.data)
+    position_error = float(np.linalg.norm(target - env.data.xpos[env.hand_id]))
+    quaternion_residual = np.zeros(3, dtype=np.float64)
+    mujoco.mju_subQuat(quaternion_residual, quat, env.data.xquat[env.hand_id])
+    quaternion_residual = env.data.xmat[env.hand_id].reshape(3, 3) @ quaternion_residual
+    orientation_error = float(np.linalg.norm(quaternion_residual))
+    return IKResult(q=q.copy(), converged=bool(
+        position_error <= position_tolerance and orientation_error <= orientation_tolerance
+    ), position_error=position_error, iterations=iterations)

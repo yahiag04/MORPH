@@ -34,7 +34,8 @@ class ContactManipulationEnvTests(unittest.TestCase):
 
         package_geom = env.package_geom_id
         np.testing.assert_allclose(env.model.geom_size[package_geom], (0.025, 0.020, 0.012))
-        self.assertAlmostEqual(env.model.body_mass[env.package_body_id], 0.06)
+        self.assertAlmostEqual(env.model.body_mass[env.package_body_id], 0.02)
+        np.testing.assert_allclose(env.data.qpos[:7], (0.0, -0.5, 0.0, -1.7, 0.0, 2.0, 0.0))
         for name in ("tray_floor", "tray_wall_front", "tray_wall_back", "tray_wall_left", "tray_wall_right"):
             geom_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_GEOM, name)
             self.assertGreater(env.model.geom_contype[geom_id], 0)

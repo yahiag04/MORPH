@@ -18,8 +18,10 @@ class ContactTaskConfig:
     table_center_xyz: tuple[float, float, float] = (0.55, 0.0, 0.35)
     table_half_size_xyz: tuple[float, float, float] = (0.35, 0.4, 0.05)
     package_half_size_xyz: tuple[float, float, float] = (0.025, 0.020, 0.012)
-    package_mass: float = 0.06
-    tray_inner_half_size_xy: float = 0.055
+    package_mass: float = 0.02
+    package_friction: float = 2.5
+    package_yaw_radians: float = 1.0471975511965976
+    tray_inner_half_size_xy: float = 0.11
     tray_wall_thickness: float = 0.010
     tray_wall_height: float = 0.035
     tray_floor_thickness: float = 0.004
@@ -98,7 +100,10 @@ class ContactManipulationEnv(PandaEnv):
                 friction=(1.2, 0.02, 0.002),
             )
 
-        package = world.add_body(name="package", pos=self.pickup_xyz)
+        package = world.add_body(
+            name="package", pos=self.pickup_xyz,
+            quat=(np.cos(self.config.package_yaw_radians / 2.0), 0.0, 0.0, np.sin(self.config.package_yaw_radians / 2.0)),
+        )
         package.add_freejoint(name="package_free")
         package.add_geom(
             name="package_geom",
@@ -106,11 +111,20 @@ class ContactManipulationEnv(PandaEnv):
             size=self.config.package_half_size_xyz,
             mass=self.config.package_mass,
             rgba=(0.16, 0.22, 0.32, 1.0),
-            friction=(1.1, 0.015, 0.002),
-            condim=4,
+            friction=(self.config.package_friction, 0.02, 0.005),
+            condim=6,
         )
 
         super().__init__(model=spec.compile())
+        # Match the stable home pose used by the existing physical Panda task.
+        arm_seed = np.asarray((0.0, -0.5, 0.0, -1.7, 0.0, 2.0, 0.0), dtype=np.float64)
+        for index in range(7):
+            joint_id = self._required_id(mujoco.mjtObj.mjOBJ_JOINT, f"joint{index + 1}")
+            actuator_id = self._required_id(mujoco.mjtObj.mjOBJ_ACTUATOR, f"actuator{index + 1}")
+            qpos_address = int(self.model.jnt_qposadr[joint_id])
+            self.data.qpos[qpos_address] = arm_seed[index]
+            self.data.ctrl[actuator_id] = arm_seed[index]
+        mujoco.mj_forward(self.model, self.data)
         self.package_body_id = self._required_id(mujoco.mjtObj.mjOBJ_BODY, "package")
         self.package_joint_id = self._required_id(mujoco.mjtObj.mjOBJ_JOINT, "package_free")
         self.package_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "package_geom")

@@ -94,7 +94,7 @@ def map_hand_trajectory(
         v = np.clip((y - mapping.image_top) / (mapping.image_bottom - mapping.image_top), 0, 1)
     trajectory = np.column_stack((
         mapping.robot_x_min + u * (mapping.robot_x_max - mapping.robot_x_min),
-        mapping.robot_y_max - v * (mapping.robot_y_max - mapping.robot_y_min),
+        mapping.robot_y_min + v * (mapping.robot_y_max - mapping.robot_y_min),
         np.full(len(rows), mapping.robot_z),
     ))
 
