@@ -1,0 +1,2 @@
+# Install into a separate Python environment; the core MuJoCo environment stays lightweight.
+torch>=2.2,<3

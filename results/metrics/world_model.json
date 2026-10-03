@@ -1,0 +1,22 @@
+{
+  "state_dim": 19,
+  "action_dim": 4,
+  "hidden_dim": 128,
+  "train_clip_count": 12,
+  "validation_clip_count": 4,
+  "validation_transition_count": 1402,
+  "epochs_run": 57,
+  "one_step_rmse": 0.4679884086805405,
+  "persistence_one_step_rmse": 0.48412485905500646,
+  "rollout_horizon_steps": 25,
+  "rollout_seconds": 0.5,
+  "rollout_rmse": 0.3271695873254175,
+  "persistence_rollout_rmse": 0.1744370553036964,
+  "rollout_count": 54,
+  "dataset": "MuJoCo transitions driven by 16 recorded human demonstrations",
+  "training_clips": 12,
+  "held_out_clips": 4,
+  "normalization": "state, action, and state-delta scales fit on training clips only; binary contact flags are left unscaled",
+  "baseline": "persistence: predict state(t+1) = state(t)",
+  "limitations": "Simulation-derived transitions; proxy for task dynamics, not physical-robot validation."
+}
