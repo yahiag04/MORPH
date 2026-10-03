@@ -71,20 +71,20 @@
 
 **Files:** create `src/world_model/state_dynamics.py`, `scripts/train_world_model.py`, `tests/test_state_dynamics.py`, and an optional training requirements file.
 
-- [ ] Add failing tests for state/action dimensions, finite normalized inputs, prediction shape, clip-level train/validation split, and improvement reporting relative to persistence on a deterministic synthetic transition set.
-- [ ] Select an available supported Python/PyTorch runtime and document it separately from the existing Python 3.14 environment; do not add PyTorch to core requirements.
-- [ ] Implement a small MLP transition model with input `[state_t, action_t]` and target `state_(t+1)-state_t`; include continuous-state normalization calculated only from training clips.
-- [ ] Train from locally generated MuJoCo transitions using human-derived trajectory commands. Split whole clip identifiers before training so no transitions from one clip cross into both sets. Use the ordered 19-value state `[ee_xyz, arm_qpos, package_xyz, package_linear_velocity, gripper_aperture, package_gripper_contact, package_support_contact]`, 4-value action `[cartesian_target_xyz, gripper_aperture_target]`, and two 128-unit hidden layers.
-- [ ] Report one-step RMSE and 0.5-second free-rollout RMSE against both MuJoCo and a persistence predictor, grouped by held-out clip. Keep checkpoints and predictions local.
-- [ ] Run synthetic tests, then train/evaluate on the real-data-derived transitions. If the model fails to beat persistence on held-out clips, report that result and do not claim useful predictive fidelity.
-- [ ] Commit as `feat: learn action-conditioned task dynamics`.
+- [x] Add failing tests for state/action dimensions, finite normalized inputs, prediction shape, clip-level train/validation split, and improvement reporting relative to persistence on a deterministic synthetic transition set.
+- [x] Select an available supported Python/PyTorch runtime and document it separately from the existing Python 3.14 environment; do not add PyTorch to core requirements.
+- [x] Implement a small MLP transition model with input `[state_t, action_t]` and target `state_(t+1)-state_t`; include continuous-state normalization calculated only from training clips.
+- [x] Train from locally generated MuJoCo transitions using human-derived trajectory commands. Split whole clip identifiers before training so no transitions from one clip cross into both sets. Use the ordered 19-value state `[ee_xyz, arm_qpos, package_xyz, package_linear_velocity, gripper_aperture, package_gripper_contact, package_support_contact]`, 4-value action `[cartesian_target_xyz, gripper_aperture_target]`, and two 128-unit hidden layers.
+- [x] Report one-step RMSE and 0.5-second free-rollout RMSE against both MuJoCo and a persistence predictor, grouped by held-out clip. Keep checkpoints and predictions local.
+- [x] Run synthetic tests, then train/evaluate on the real-data-derived transitions. The model slightly improves one-step RMSE but is worse than persistence in a 0.5-second rollout; report that limit without claiming reliable predictive fidelity.
+- [x] Commit as `feat: learn action-conditioned task dynamics` (`10e98e3`).
 
 ## Task 5: Publish the Application-Ready Story
 
 **Files:** update `README.md`, `docs/data_collection.md`, and aggregate-only `results/metrics/` and `results/figures/`.
 
-- [ ] Update the project flow to show collected video → retargeted action → physical contact manipulation → learned state prediction.
-- [ ] Publish a compact table for robot task success by human label and world-model held-out error versus persistence; clearly state episode counts and simulation-proxy limits.
-- [ ] Document installation of the optional model environment, local layout JSON format, training/evaluation commands, and the local paired-demo command.
-- [ ] Run all core tests and optional world-model tests, verify every documented command's `--help`, inspect staged files for personal data, and scan the public tree/commit messages for development-tool references.
+- [x] Update the project flow to show collected video → retargeted action → physical contact manipulation → learned state prediction.
+- [x] Publish a compact table for robot task success by human label and world-model held-out error versus persistence; clearly state episode counts and simulation-proxy limits.
+- [x] Document installation of the optional model environment, local layout JSON format, training/evaluation commands, and the local paired-demo command.
+- [x] Run all core tests and optional world-model tests, verify documented CLI commands with `--help`, inspect staged files for personal data, and scan the public tree/commit messages for development-tool references.
 - [ ] Commit as `docs: publish contact task and world model results` and push to `main` after final review.

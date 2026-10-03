@@ -6,9 +6,8 @@ import mujoco
 import numpy as np
 
 
-DEFAULT_MODEL_PATH = Path(
-    "/Users/yahiaghallale/Documents/mujoco_menagerie/"
-    "franka_emika_panda/scene.xml"
+DEFAULT_MODEL_PATH = (
+    Path.home() / "Documents/mujoco_menagerie/franka_emika_panda/scene.xml"
 )
 
 

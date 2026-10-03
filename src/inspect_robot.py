@@ -1,8 +1,10 @@
+from pathlib import Path
+
 import mujoco
 
-MODEL_PATH = "/Users/yahiaghallale/Documents/mujoco_menagerie/franka_emika_panda/scene.xml"
+MODEL_PATH = Path.home() / "Documents/mujoco_menagerie/franka_emika_panda/scene.xml"
 
-model = mujoco.MjModel.from_xml_path(MODEL_PATH)
+model = mujoco.MjModel.from_xml_path(str(MODEL_PATH))
 
 print("\n=== BODIES ===")
 for i in range(model.nbody):

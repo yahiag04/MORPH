@@ -10,11 +10,11 @@ MORPH is a research prototype for turning a human tabletop demonstration into a 
   <em>Measured end-effector path and tracking error from the simulated pick-and-place baseline.</em>
 </p>
 
-> **Current status:** the pipeline has been run on 16 real overhead recordings (12 labeled successful and 4 labeled failed). These labels describe the human attempts; the Panda replay is a separate kinematic simulation and does not reproduce object grasping or predict task success.
+> **Current status:** 16 overhead recordings (12 human-labeled successful, 4 failed) drive contact-manipulation simulations and a learned state-dynamics model. The reported robot outcomes and world-model transitions come from MuJoCo; they are not physical-robot validation.
 
 ## The idea
 
-A person performs a simple tabletop task. The system tracks the palm in the video, maps its image coordinates to a bounded Panda workspace, and replays the resulting path through inverse kinematics.
+A person moves a small package from a pickup point toward a bowl. The system tracks the hand, estimates pickup and target locations, maps the demonstration into a Panda workspace, and uses the resulting commands to operate a physical contact simulation. An action-conditioned model then predicts how the simulated task state changes.
 
 ```mermaid
 flowchart LR
@@ -22,10 +22,11 @@ flowchart LR
     P --> T[Timestamped XY observations]
     T --> R[Calibrated workspace mapping]
     R --> I[Cartesian path and inverse kinematics]
-    I --> F[Franka Panda in MuJoCo]
+    I --> F[Franka Panda contacts package in MuJoCo]
+    F --> W[Learned state dynamics]
 ```
 
-The simulation also has a separate scripted **oracle** pick-and-place sequence. It checks that the table, cube, gripper, contact physics, and target region form a solvable task. The human-video replay follows a mapped palm path; it does not infer object intent or execute a human-guided grasp policy.
+The simulation includes a free-moving package and a colliding tray. The gripper can lift and release the package through contact; the package is not attached or teleported. A separate scripted oracle remains as a physics sanity check.
 
 ## Measured simulation baseline
 
@@ -44,24 +45,32 @@ The oracle sequence was run in MuJoCo and checked against physical cube contact,
 
 These are results from the scripted simulation baseline, not from a human demonstration. The source measurements are in [`results/metrics/pick_place.json`](results/metrics/pick_place.json) and [`results/metrics/pick_place.csv`](results/metrics/pick_place.csv).
 
-## Human demonstration evaluation
+## Contact task replay from human demonstrations
 
-Sixteen phone videos were processed locally: 12 were labeled `riusciti` (successful human attempt) and 4 `falliti` (failed human attempt). Every clip was replayed in MuJoCo with both direct and confidence-aware retargeting, for 32 completed simulations. These are mapped palm trajectories; the simulation did not attempt to grasp the item shown in the recordings.
+Sixteen phone videos were processed locally: 12 were labeled `riusciti` and 4 `falliti`. Each clip was replayed with direct and confidence-aware retargeting. The controller uses detected package and tray locations, then relies on Panda gripper contact and MuJoCo physics to pick up, carry, and release the package.
 
-| Mean across 16 clips | Direct | Confidence-aware |
+| Simulation outcome | Direct | Confidence-aware |
 | --- | ---: | ---: |
-| Tracking coverage | 100% | 100% |
-| Interpolated frames | 0 | 0 |
-| Cartesian path length | 0.699 m | 0.699 m |
-| RMS Cartesian jerk | 54.84 m/s³ | 54.83 m/s³ |
-| Panda mean position error | 0.02354 m | 0.02354 m |
-| IK non-converged samples | 0 | 0 |
+| All episodes successful | 5/16 (31.3%) | 4/16 (25.0%) |
+| Human-labeled successful episodes completed | 5/12 (41.7%) | 4/12 (33.3%) |
+| Human-labeled failed episodes completed | 0/4 | 0/4 |
 
 <p align="center">
-  <img src="results/figures/human_demo_method_comparison.png" alt="Direct and confidence-aware replay metrics over 16 human video clips" width="800">
+  <img src="results/figures/contact_manipulation.png" alt="Contact manipulation outcomes for direct and confidence-aware retargeting" width="800">
 </p>
 
-The confidence-aware method made no meaningful difference on this batch: all frames were detected and the confidence signal did not cause interpolation. Its confidence value is a hand-classification score used as a proxy, not a calibrated measure of palm localization accuracy. Position error is measured end-to-end from the Panda's reset pose; its maximum is dominated by the initial move from that pose to the first video waypoint. The XY image-to-robot mapping uses the four visible workspace markers, while robot height is fixed at 0.62 m. Treat these as a prototype evaluation, not physical camera-to-robot calibration or evidence of successful robot manipulation. Aggregate values are in [`results/metrics/human_demo_evaluation.json`](results/metrics/human_demo_evaluation.json); local per-clip data and recordings are intentionally excluded.
+The simulation success criteria require physical package lift and stable placement in the tray. Human labels describe only the recorded attempt and are not treated as robot outcomes. This is a prototype proxy: workspace bounds are assumed, and no real robot was evaluated. Aggregate metrics are in [`results/metrics/contact_manipulation.json`](results/metrics/contact_manipulation.json); per-clip data and recordings stay local.
+
+## Action-conditioned world model
+
+A two-hidden-layer MLP predicts the next 19-value task state from the current state and four Cartesian/gripper command values. It is trained on the MuJoCo transitions generated by the demonstration replays. Entire clips are held out from training. Across the held-out clips, one-step prediction is slightly better than predicting no state change, while the 0.5-second free rollout is worse; this is a measured baseline, not evidence of reliable long-horizon prediction.
+
+| Held-out metric (RMSE) | World model | Persistence |
+| --- | ---: | ---: |
+| One step | 0.4680 | 0.4841 |
+| 0.5-second rollout | 0.3272 | 0.1744 |
+
+The held-out split contains 4 clips (1,402 transitions); training uses 12 clips. Values average across state dimensions with the train-only normalization described in [`results/metrics/world_model.json`](results/metrics/world_model.json). The comparison plot is [`results/figures/world_model.png`](results/figures/world_model.png).
 
 ## What is implemented
 
@@ -72,6 +81,7 @@ The confidence-aware method made no meaningful difference on this batch: all fra
 - Explicit image bounds, fixed robot height, missing-frame interpolation, smoothing, and a Cartesian speed cap.
 - A replay command that records target-versus-actual simulation measurements as CSV, JSON, and PNG.
 - Per-video workspace marker calibration, batch processing, paired local human/Panda video rendering, and aggregate method evaluation.
+- Contact-based package transfer in MuJoCo and clip-held-out action-conditioned state prediction.
 
 ## Quick start
 
@@ -112,18 +122,35 @@ PYTHONPATH=src python scripts/evaluate_demonstrations.py \
   --processing-manifest /path/to/local_morph_data/processing_manifest.json \
   --calibration-dir /path/to/local_morph_data/calibrations \
   --output-dir /path/to/local_morph_evaluation
+PYTHONPATH=src python scripts/evaluate_contact_demos.py \
+  --processing-manifest /path/to/local_morph_data/processing_manifest.json \
+  --calibration-dir /path/to/local_morph_data/calibrations \
+  --output-dir /path/to/local_contact_evaluation
 ```
 
 The first processing run downloads the pinned MediaPipe hand-landmarker model to `assets/models/` and verifies its SHA-256 checksum. MediaPipe processes video frames on-device and reports API usage and performance metrics to Google. To make a paired demo for one clip after evaluation, use its annotated recording and trajectory CSV:
 
 ```bash
 PYTHONPATH=src python scripts/make_paired_demo.py \
-  /path/to/local_morph_data/processed/riusciti/IMG_7848_tracked.mp4 \
-  /path/to/local_morph_evaluation/per_clip/riusciti/IMG_7848/direct_trajectory.csv \
+  /path/to/local_morph_data/processed/riusciti/example_tracked.mp4 \
+  /path/to/local_morph_evaluation/per_clip/riusciti/example/direct_trajectory.csv \
   --output-dir /path/to/local_paired_demo
 ```
 
 The script creates a Panda replay and a side-by-side MP4. These videos and per-clip files remain local; only aggregate metrics and a plot are checked in.
+
+### Train the optional world model
+
+Keep the existing MuJoCo environment unchanged and create a separate Python environment with PyTorch (`python3 -m venv ~/Documents/.venv-world-model`, activate it, then `python -m pip install -r requirements.txt requirements-world-model.txt`). Generate contact transitions with `scripts/evaluate_contact_demos.py` as shown above, writing results outside the repository, then train and evaluate:
+
+```bash
+PYTHONPATH=src python scripts/train_world_model.py \
+  --direct-transitions /path/to/contact_evaluation/direct_transitions.npz \
+  --confidence-transitions /path/to/contact_evaluation/confidence-aware_transitions.npz \
+  --output-dir /path/to/local_world_model
+```
+
+The command saves the checkpoint and clip-level details locally. The checked-in metrics and figure contain aggregate values only. `--help` lists available training options.
 
 Read the full [recording, calibration, and processing protocol](docs/data_collection.md) before interpreting a replay. Marker calibration maps the recorded workspace corners to assumed robot XY bounds; it does not measure camera-to-robot geometry. Monocular video does not provide metric hand height, so the current mapping uses a fixed Z plane.
 
@@ -133,8 +160,9 @@ Read the full [recording, calibration, and processing protocol](docs/data_collec
 src/
   perception/       video import, hand tracking, workspace mapping
   simulation/       Panda environment, IK, trajectory and pick-place control
-  evaluation/       measured trajectory plots
-scripts/            runnable import, processing, retargeting, and simulation commands
+  evaluation/       contact outcomes and trajectory evaluation
+  world_model/      action-conditioned state prediction
+scripts/            runnable import, processing, retargeting, simulation, and training commands
 data/
   raw/              local source videos (ignored)
   processed/        local tracking output (ignored)
@@ -147,13 +175,13 @@ tests/              unit tests and generated-video fixtures
 
 ## Limitations and next steps
 
-- Demonstrations are human-labeled video; no robot grasp, object transfer, or robot task-success outcome has been evaluated.
+- The Panda success rates and learned transitions come from simulation. No physical robot grasp or transfer has been evaluated.
 - The current tracker follows a palm point, not the object, and does not classify task phases or grasp intent.
 - Camera-to-robot bounds must be calibrated for the recording setup. The current mapping uses a fixed Z and cannot recover physical depth from a single video.
 - The oracle baseline is scripted and uses a simple cube. Its success does not establish performance on human demonstrations.
 - Temporal nearest-palm tracking can still confuse hands that cross or move close together.
 
-Next, improve the confidence signal and validate physical camera-to-robot geometry before claiming that simulated replay accuracy predicts real robot behavior.
+The current world model does not beat persistence over a 0.5-second rollout. Improve long-horizon dynamics prediction and validate camera-to-robot geometry before transferring this pipeline to a physical robot.
 
 ## Verification
 
