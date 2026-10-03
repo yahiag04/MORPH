@@ -10,7 +10,7 @@ MORPH is a research prototype for turning a human tabletop demonstration into a 
   <em>Measured end-effector path and tracking error from the simulated pick-and-place baseline.</em>
 </p>
 
-> **Current status:** the simulation baseline and human-video processing tools are implemented. The first real human recording has not yet been collected, so human-to-robot results are not reported.
+> **Current status:** the pipeline has been run on 16 real overhead recordings (12 labeled successful and 4 labeled failed). These labels describe the human attempts; the Panda replay is a separate kinematic simulation and does not reproduce object grasping or predict task success.
 
 ## The idea
 
@@ -25,7 +25,7 @@ flowchart LR
     I --> F[Franka Panda in MuJoCo]
 ```
 
-The simulation also has a separate scripted **oracle** pick-and-place sequence. It checks that the table, cube, gripper, contact physics, and target region form a solvable task before human demonstrations are introduced. The current video replay follows a mapped hand path; it does not yet infer object intent or execute a human-guided grasp policy.
+The simulation also has a separate scripted **oracle** pick-and-place sequence. It checks that the table, cube, gripper, contact physics, and target region form a solvable task. The human-video replay follows a mapped palm path; it does not infer object intent or execute a human-guided grasp policy.
 
 ## Measured simulation baseline
 
@@ -44,6 +44,25 @@ The oracle sequence was run in MuJoCo and checked against physical cube contact,
 
 These are results from the scripted simulation baseline, not from a human demonstration. The source measurements are in [`results/metrics/pick_place.json`](results/metrics/pick_place.json) and [`results/metrics/pick_place.csv`](results/metrics/pick_place.csv).
 
+## Human demonstration evaluation
+
+Sixteen phone videos were processed locally: 12 were labeled `riusciti` (successful human attempt) and 4 `falliti` (failed human attempt). Every clip was replayed in MuJoCo with both direct and confidence-aware retargeting, for 32 completed simulations. These are mapped palm trajectories; the simulation did not attempt to grasp the item shown in the recordings.
+
+| Mean across 16 clips | Direct | Confidence-aware |
+| --- | ---: | ---: |
+| Tracking coverage | 100% | 100% |
+| Interpolated frames | 0 | 0 |
+| Cartesian path length | 0.699 m | 0.699 m |
+| RMS Cartesian jerk | 54.84 m/s³ | 54.83 m/s³ |
+| Panda mean position error | 0.02354 m | 0.02354 m |
+| IK non-converged samples | 0 | 0 |
+
+<p align="center">
+  <img src="results/figures/human_demo_method_comparison.png" alt="Direct and confidence-aware replay metrics over 16 human video clips" width="800">
+</p>
+
+The confidence-aware method made no meaningful difference on this batch: all frames were detected and the confidence signal did not cause interpolation. Its confidence value is a hand-classification score used as a proxy, not a calibrated measure of palm localization accuracy. Position error is measured end-to-end from the Panda's reset pose; its maximum is dominated by the initial move from that pose to the first video waypoint. The XY image-to-robot mapping uses the four visible workspace markers, while robot height is fixed at 0.62 m. Treat these as a prototype evaluation, not physical camera-to-robot calibration or evidence of successful robot manipulation. Aggregate values are in [`results/metrics/human_demo_evaluation.json`](results/metrics/human_demo_evaluation.json); local per-clip data and recordings are intentionally excluded.
+
 ## What is implemented
 
 - Panda end-effector state, damped inverse kinematics, and Cartesian path following.
@@ -52,6 +71,7 @@ These are results from the scripted simulation baseline, not from a human demons
 - MediaPipe hand tracking with decoded video timestamps, confidence scores, and an annotated video for inspection.
 - Explicit image bounds, fixed robot height, missing-frame interpolation, smoothing, and a Cartesian speed cap.
 - A replay command that records target-versus-actual simulation measurements as CSV, JSON, and PNG.
+- Per-video workspace marker calibration, batch processing, paired local human/Panda video rendering, and aggregate method evaluation.
 
 ## Quick start
 
@@ -78,28 +98,34 @@ PYTHONPATH=src mjpython scripts/run_pick_place.py
 
 The script opens the viewer and saves measured outputs under `results/metrics/` and `results/figures/`.
 
-### Process a human demonstration
+### Process and evaluate human demonstrations
 
-Import one original phone video, then track and map the hand path:
+Put original clips in immediate label subfolders such as `riusciti/` and `falliti/`. The scripts write frame-level data, review videos, and calibration files to directories outside the repository. Keep your source videos private and inspect the marker review images before interpreting results.
 
 ```bash
 source ~/Documents/.venv/bin/activate
-PYTHONPATH=src python scripts/import_demonstration.py /path/to/overhead_video.mp4
-PYTHONPATH=src python scripts/process_video.py data/raw/demo_001.mp4
-PYTHONPATH=src python scripts/retarget_trajectory.py \
-  data/processed/demo_001.csv \
-  --output data/trajectories/demo_001.csv \
-  --image-bounds 0.20 0.80 0.15 0.85 \
-  --robot-bounds 0.38 0.68 -0.22 0.22 \
-  --robot-z 0.62
-PYTHONPATH=src mjpython scripts/replay_demo.py \
-  data/trajectories/demo_001.csv \
-  --results-name demo_001
+PYTHONPATH=src python scripts/process_dataset.py /path/to/videos \
+  --output-dir /path/to/local_morph_data
+PYTHONPATH=src python scripts/calibrate_workspace.py /path/to/videos \
+  --output-dir /path/to/local_morph_data/calibrations
+PYTHONPATH=src python scripts/evaluate_demonstrations.py \
+  --processing-manifest /path/to/local_morph_data/processing_manifest.json \
+  --calibration-dir /path/to/local_morph_data/calibrations \
+  --output-dir /path/to/local_morph_evaluation
 ```
 
-The first processing run downloads the pinned MediaPipe hand-landmarker model to `assets/models/` and verifies its SHA-256 checksum. Videos, extracted trajectories, and the downloaded model are ignored by Git and stay local. MediaPipe processes video frames on-device and reports API usage and performance metrics to Google.
+The first processing run downloads the pinned MediaPipe hand-landmarker model to `assets/models/` and verifies its SHA-256 checksum. MediaPipe processes video frames on-device and reports API usage and performance metrics to Google. To make a paired demo for one clip after evaluation, use its annotated recording and trajectory CSV:
 
-Read the full [recording, calibration, and processing protocol](docs/data_collection.md) before interpreting a replay. The default workspace bounds are starting assumptions; calibrate them to the actual camera view. Monocular video does not provide metric hand height, so the current mapping uses a fixed Z plane.
+```bash
+PYTHONPATH=src python scripts/make_paired_demo.py \
+  /path/to/local_morph_data/processed/riusciti/IMG_7848_tracked.mp4 \
+  /path/to/local_morph_evaluation/per_clip/riusciti/IMG_7848/direct_trajectory.csv \
+  --output-dir /path/to/local_paired_demo
+```
+
+The script creates a Panda replay and a side-by-side MP4. These videos and per-clip files remain local; only aggregate metrics and a plot are checked in.
+
+Read the full [recording, calibration, and processing protocol](docs/data_collection.md) before interpreting a replay. Marker calibration maps the recorded workspace corners to assumed robot XY bounds; it does not measure camera-to-robot geometry. Monocular video does not provide metric hand height, so the current mapping uses a fixed Z plane.
 
 ## Repository map
 
@@ -121,13 +147,13 @@ tests/              unit tests and generated-video fixtures
 
 ## Limitations and next steps
 
-- There is no real human demonstration in the repository yet; the hand-tracking pipeline still needs to be validated on the first recording.
+- Demonstrations are human-labeled video; no robot grasp, object transfer, or robot task-success outcome has been evaluated.
 - The current tracker follows a palm point, not the object, and does not classify task phases or grasp intent.
 - Camera-to-robot bounds must be calibrated for the recording setup. The current mapping uses a fixed Z and cannot recover physical depth from a single video.
 - The oracle baseline is scripted and uses a simple cube. Its success does not establish performance on human demonstrations.
 - Temporal nearest-palm tracking can still confuse hands that cross or move close together.
 
-Next, process real overhead recordings, inspect the annotated tracking video, calibrate the workspace, and compare direct retargeting against a confidence-aware variant. Add results only after those experiments have been run.
+Next, improve the confidence signal and validate physical camera-to-robot geometry before claiming that simulated replay accuracy predicts real robot behavior.
 
 ## Verification
 
@@ -137,4 +163,4 @@ Run the test suite from the repository root:
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-At the current milestone, all 55 tests pass. Video tests use generated temporary fixtures; they do not count as human demonstration data.
+At the current milestone, run the suite with the command above. Video unit tests use generated temporary fixtures; the 16 recordings used for the published aggregate remain local and are not included in the repository.

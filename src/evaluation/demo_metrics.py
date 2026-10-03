@@ -24,7 +24,9 @@ def tracking_metrics(
     if not np.isfinite(threshold) or not 0 <= threshold <= 1:
         raise ValueError("threshold must be finite and between zero and one")
 
-    detected_frames = int(np.count_nonzero(scores >= threshold))
+    # The video processor writes confidence=0 for a missing detection. Exclude
+    # that sentinel even when a caller sets the threshold to zero.
+    detected_frames = int(np.count_nonzero((scores > 0) & (scores >= threshold)))
     sample_count = int(scores.size)
     return {
         "sample_count": sample_count,

@@ -1,0 +1,78 @@
+{
+  "dataset": {
+    "clips": 16,
+    "human_label_counts": {
+      "riusciti": 12,
+      "falliti": 4
+    }
+  },
+  "methods": {
+    "direct": {
+      "completed_runs": 16,
+      "metrics": {
+        "coverage_fraction": {
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "interpolated_frames": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "path_length_m": {
+          "mean": 0.6987560885557903,
+          "std": 0.1305212140415922
+        },
+        "jerk_rms_mps3": {
+          "mean": 54.84053828286237,
+          "std": 11.244722967841659
+        },
+        "ik_nonconverged_count": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "mean_position_error_m": {
+          "mean": 0.023544671069446757,
+          "std": 0.0011249440734857853
+        },
+        "max_position_error_m": {
+          "mean": 0.26010106586448395,
+          "std": 0.015605265852380198
+        }
+      }
+    },
+    "confidence-aware": {
+      "completed_runs": 16,
+      "metrics": {
+        "coverage_fraction": {
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "interpolated_frames": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "path_length_m": {
+          "mean": 0.6986440786928063,
+          "std": 0.13052490695778987
+        },
+        "jerk_rms_mps3": {
+          "mean": 54.834958299880114,
+          "std": 11.299139627834183
+        },
+        "ik_nonconverged_count": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "mean_position_error_m": {
+          "mean": 0.0235408812722454,
+          "std": 0.0011253745968595617
+        },
+        "max_position_error_m": {
+          "mean": 0.26010335909843374,
+          "std": 0.015606933631756668
+        }
+      }
+    }
+  },
+  "failed_runs": 0
+}

@@ -14,6 +14,10 @@ CORNER_NAMES = ("TL", "TR", "BR", "BL")
 
 def calibrate_video(video_path: Path, output_dir: Path) -> tuple[Path, Path]:
     """Save one video's normalized marker calibration and review image."""
+    repo_root = Path(__file__).resolve().parents[1]
+    resolved_output = output_dir.expanduser().resolve()
+    if resolved_output == repo_root or repo_root in resolved_output.parents:
+        raise ValueError("output directory must be outside the repository to keep personal data local")
     capture = cv2.VideoCapture(str(video_path))
     try:
         if not capture.isOpened():
@@ -74,6 +78,9 @@ def main() -> int:
     ]
     if not videos:
         parser.error(f"no supported videos found under labeled directories in {video_root}")
+    destinations = [(video.parent.name.casefold(), video.stem.casefold()) for video in videos]
+    if len(destinations) != len(set(destinations)):
+        parser.error("duplicate video names within a label would overwrite local calibration outputs")
 
     failures = 0
     for video in videos:

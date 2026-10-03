@@ -2,8 +2,10 @@
 
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import cv2
 import numpy as np
@@ -13,6 +15,7 @@ from perception.workspace_calibration import (
     detect_workspace_corners,
     rectify_image_points,
 )
+from scripts.calibrate_workspace import calibrate_video, main as calibrate_workspace_main
 
 
 def pink_marker_frame(points, size=(640, 480)):
@@ -26,6 +29,23 @@ def pink_marker_frame(points, size=(640, 480)):
 
 
 class WorkspaceCalibrationTests(unittest.TestCase):
+    def test_rejects_calibration_preview_output_inside_repository(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        with self.assertRaisesRegex(ValueError, "outside the repository"):
+            calibrate_video(Path("does-not-need-to-exist.mov"), repo_root)
+
+    def test_calibration_cli_rejects_duplicate_video_stems(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            label = root / "videos" / "success"
+            label.mkdir(parents=True)
+            (label / "take.mov").write_bytes(b"one")
+            (label / "take.mp4").write_bytes(b"two")
+            argv = ["calibrate_workspace.py", str(label.parent), "--output-dir", str(root / "out")]
+            with mock.patch.object(sys, "argv", argv):
+                with self.assertRaises(SystemExit):
+                    calibrate_workspace_main()
+
     def test_detects_corners_in_clockwise_image_order(self):
         expected = np.asarray(((0.15, 0.15), (0.82, 0.2), (0.78, 0.84), (0.12, 0.88)))
         actual = detect_workspace_corners(pink_marker_frame(expected))

@@ -1,13 +1,17 @@
 """Tests for local real/Panda side-by-side video assembly."""
 
 from pathlib import Path
+import os
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import cv2
 import numpy as np
 
 from evaluation.demo_video import make_paired_video
+from scripts.make_paired_demo import main as make_paired_demo_main
 
 
 def write_color_video(path: Path, colors, size=(96, 64), fps=10.0):
@@ -71,6 +75,41 @@ class DemoVideoTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "must not overwrite"):
                 make_paired_video(real, robot, real)
             self.assertEqual(real.read_bytes(), original)
+
+    def test_cli_checks_robot_output_alias_before_rendering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tracked = root / "panda_replay.mp4"
+            tracked.write_bytes(b"input recording")
+            trajectory = root / "path.csv"
+            trajectory.write_text("x,y,z\n0,0,0\n1,1,1\n")
+            original = tracked.read_bytes()
+            argv = ["make_paired_demo.py", str(tracked), str(trajectory), "--output-dir", str(root)]
+            with mock.patch.object(sys, "argv", argv), mock.patch(
+                "scripts.make_paired_demo.render_panda_trajectory"
+            ) as render:
+                with self.assertRaises(SystemExit):
+                    make_paired_demo_main()
+            render.assert_not_called()
+            self.assertEqual(tracked.read_bytes(), original)
+
+    def test_cli_rejects_hard_link_alias_before_rendering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tracked = root / "tracked_source.mp4"
+            tracked.write_bytes(b"input recording")
+            os.link(tracked, root / "panda_replay.mp4")
+            trajectory = root / "path.csv"
+            trajectory.write_text("x,y,z\n0,0,0\n1,1,1\n")
+            original = tracked.read_bytes()
+            argv = ["make_paired_demo.py", str(tracked), str(trajectory), "--output-dir", str(root)]
+            with mock.patch.object(sys, "argv", argv), mock.patch(
+                "scripts.make_paired_demo.render_panda_trajectory"
+            ) as render:
+                with self.assertRaises(SystemExit):
+                    make_paired_demo_main()
+            render.assert_not_called()
+            self.assertEqual(tracked.read_bytes(), original)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,11 @@ class DemoMetricsTests(unittest.TestCase):
         self.assertEqual(metrics["interpolated_frames"], 2)
         self.assertEqual(metrics["coverage_fraction"], 0.5)
 
+    def test_zero_confidence_missing_frame_stays_missing_at_zero_threshold(self):
+        metrics = tracking_metrics(np.asarray((0.0, 0.1)), np.asarray((0.0, 0.8)), threshold=0.0)
+        self.assertEqual(metrics["coverage_fraction"], 0.5)
+        self.assertEqual(metrics["interpolated_frames"], 1)
+
     def test_straight_path_has_known_length_and_zero_jerk(self):
         times = np.asarray((0.0, 0.1, 0.2, 0.3))
         points = np.column_stack((2 * times, np.zeros((4, 2))))

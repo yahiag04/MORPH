@@ -9,6 +9,21 @@ import numpy as np
 from evaluation.demo_video import make_paired_video, render_panda_trajectory
 
 
+def _reject_output_input_aliases(output_paths: list[Path], inputs: list[Path]) -> None:
+    resolved_outputs = [path.expanduser().resolve() for path in output_paths]
+    resolved_inputs = [path.expanduser().resolve() for path in inputs]
+    all_paths = resolved_outputs + resolved_inputs
+    for index, path in enumerate(resolved_outputs):
+        for other in all_paths[index + 1:]:
+            if path == other:
+                raise ValueError("generated video paths must not overwrite an input")
+            try:
+                if path.exists() and other.exists() and path.samefile(other):
+                    raise ValueError("generated video paths must not overwrite an input")
+            except OSError:
+                continue
+
+
 def read_trajectory(path: Path) -> np.ndarray:
     """Read finite XYZ columns from a retargeted CSV."""
     with path.open(newline="", encoding="utf-8") as stream:
@@ -39,17 +54,23 @@ def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     if output_dir == repo_root or repo_root in output_dir.parents:
         parser.error("output directory must be outside the repository to keep personal videos local")
+    robot_output = output_dir / "panda_replay.mp4"
+    paired_output = output_dir / "human_panda_paired.mp4"
+    try:
+        _reject_output_input_aliases([robot_output, paired_output], [tracked_video, trajectory_csv])
+    except ValueError as error:
+        parser.error(str(error))
     output_dir.mkdir(parents=True, exist_ok=True)
     points = read_trajectory(trajectory_csv)
     robot_video = render_panda_trajectory(
         points,
-        output_dir / "panda_replay.mp4",
+        robot_output,
         model_path=args.model_path,
     )
     paired_video = make_paired_video(
         tracked_video,
         robot_video,
-        output_dir / "human_panda_paired.mp4",
+        paired_output,
     )
     print(f"Panda replay: {robot_video}")
     print(f"Paired demo: {paired_video}")
