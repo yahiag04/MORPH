@@ -34,20 +34,28 @@ def _load(path: Path, method: str) -> dict[str, np.ndarray]:
 
 def _plot(metrics: dict, destination: Path) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(8, 3.7), constrained_layout=True)
-    names = ["World model", "Persistence"]
-    colors = ["#3568a8", "#b5bec8"]
-    one = [metrics["one_step_rmse"], metrics["persistence_one_step_rmse"]]
-    roll = [metrics["rollout_rmse"], metrics["persistence_rollout_rmse"]]
-    axes[0].bar(names, one, color=colors)
-    axes[0].set_title("One-step prediction")
-    axes[1].bar(names, roll, color=colors)
-    axes[1].set_title("0.5 s free rollout")
+    names = ["EE position", "Arm position", "Package position"]
+    learned = [metrics["groups"][key]["world_model_rmse"]
+               for key in ("ee_position", "arm_position", "package_position")]
+    persistence = [metrics["groups"][key]["persistence_rmse"]
+                   for key in ("ee_position", "arm_position", "package_position")]
+    x = np.arange(len(names))
+    width = 0.36
+    axes[0].bar(x - width / 2, learned, width, label="World model", color="#3568a8")
+    axes[0].bar(x + width / 2, persistence, width, label="Persistence", color="#b5bec8")
+    axes[0].set_xticks(x, names)
+    axes[0].set_ylabel("Position RMSE (m)")
+    axes[0].set_title("0.5 s free rollout")
+    axes[0].legend(frameon=False)
+    axes[1].bar(["Accuracy", "F1"],
+                [metrics["rollout_contact_accuracy"], metrics["rollout_contact_f1"]],
+                color="#5f9e79")
+    axes[1].set_ylim(0, 1)
+    axes[1].set_title("Contact prediction at rollout end")
     for ax in axes:
-        ax.set_ylabel("RMSE across state values")
         ax.grid(axis="y", alpha=0.25)
         ax.set_axisbelow(True)
-        ax.tick_params(axis="x", labelrotation=10)
-    fig.suptitle("Held-out clips: learned dynamics vs persistence")
+    fig.suptitle("Held-out clips: physical groups and contact classification")
     fig.savefig(destination, dpi=180)
     plt.close(fig)
 

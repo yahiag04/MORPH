@@ -183,12 +183,14 @@ def main() -> int:
                 run["method"] = method
                 run["control_sample_count"] = int(len(trajectory))
                 transitions = run["transitions"]
-                states = np.asarray([row["state"] for row in transitions], dtype=np.float32).reshape(-1, 19)
+                states = np.asarray([row["state"] for row in transitions], dtype=np.float32).reshape(-1, 37)
                 actions = np.asarray([row["action"] for row in transitions], dtype=np.float32).reshape(-1, 4)
-                next_states = np.asarray([row["next_state"] for row in transitions], dtype=np.float32).reshape(-1, 19)
+                next_states = np.asarray([row["next_state"] for row in transitions], dtype=np.float32).reshape(-1, 37)
                 phases = [row["phase"] for row in transitions]
                 np.savez_compressed(clip_output / f"{method}_transitions.npz", states=states,
-                                    actions=actions, next_states=next_states, phases=np.asarray(phases))
+                                    actions=actions, next_states=next_states, phases=np.asarray(phases),
+                                    clip_ids=np.full(len(states), clip_id),
+                                    method=np.full(len(states), method))
                 (clip_output / f"{method}_summary.json").write_text(json.dumps(
                     {k: v for k, v in run.items() if k not in {"final_package_xyz", "transitions"}}, indent=2) + "\n", encoding="utf-8")
             except (ValueError, OSError, RuntimeError) as error:

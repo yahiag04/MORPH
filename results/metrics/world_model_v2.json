@@ -1,0 +1,186 @@
+{
+  "state_dim": 37,
+  "action_dim": 4,
+  "outer_fold_count": 4,
+  "source_clip_count": 16,
+  "transition_count": 6139,
+  "rollout_horizon_steps": 25,
+  "rollout_seconds": 0.5,
+  "fold_mean_groups": {
+    "ee_position": {
+      "normalized_one_step_rmse": 0.031409104157570956,
+      "one_step_rmse": 0.0024010291122258023,
+      "persistence_one_step_rmse": 0.0038190917152889294,
+      "persistence_rmse": 0.07641522831284442,
+      "world_model_rmse": 0.019290702905842793
+    },
+    "arm_position": {
+      "normalized_one_step_rmse": 0.027328981795980728,
+      "one_step_rmse": 0.0035785657275969754,
+      "persistence_one_step_rmse": 0.005393727906262389,
+      "persistence_rmse": 0.10539752216969162,
+      "world_model_rmse": 0.028405186918676537
+    },
+    "arm_velocity": {
+      "normalized_one_step_rmse": 0.3746137798224384,
+      "one_step_rmse": 0.014857894563005682,
+      "persistence_one_step_rmse": 0.015458029989451155,
+      "persistence_rmse": 0.046286487677911964,
+      "world_model_rmse": 0.02255893878706327
+    },
+    "package_position": {
+      "normalized_one_step_rmse": 0.05553075169976328,
+      "one_step_rmse": 0.0038525047088344556,
+      "persistence_one_step_rmse": 0.004869964979463634,
+      "persistence_rmse": 0.05216756492785489,
+      "world_model_rmse": 0.03406405401157599
+    },
+    "package_orientation": {
+      "normalized_one_step_rmse": 0.09053132774501495,
+      "one_step_rmse": 0.02202989304298881,
+      "persistence_one_step_rmse": 0.024927529560616713,
+      "persistence_rmse": 0.18404526538435148,
+      "world_model_rmse": 0.1567065141134179
+    },
+    "package_linear_velocity": {
+      "normalized_one_step_rmse": 0.9455631168203084,
+      "one_step_rmse": 0.05659446509584123,
+      "persistence_one_step_rmse": 0.0568337578460793,
+      "persistence_rmse": 0.019671227367636355,
+      "world_model_rmse": 0.02165438029761152
+    },
+    "package_angular_velocity": {
+      "normalized_one_step_rmse": 1.4884879641485578,
+      "one_step_rmse": 0.8815392823027639,
+      "persistence_one_step_rmse": 0.8815392823027639,
+      "persistence_rmse": 0.35012681896329917,
+      "world_model_rmse": 0.35012681896329917
+    },
+    "gripper_aperture": {
+      "normalized_one_step_rmse": 0.13160862483329303,
+      "one_step_rmse": 0.0037946764825963373,
+      "persistence_one_step_rmse": 0.005041879546708335,
+      "persistence_rmse": 0.03815504514397321,
+      "world_model_rmse": 0.015575255678842884
+    },
+    "gripper_velocity": {
+      "normalized_one_step_rmse": 1.0297384173939796,
+      "one_step_rmse": 0.03967293170951207,
+      "persistence_one_step_rmse": 0.044858472767197614,
+      "persistence_rmse": 0.047224925340666996,
+      "world_model_rmse": 0.04082852081807033
+    },
+    "tray_center": {
+      "normalized_one_step_rmse": 0.0,
+      "one_step_rmse": 0.0,
+      "persistence_one_step_rmse": 0.0,
+      "persistence_rmse": 0.0,
+      "world_model_rmse": 0.0
+    },
+    "contact_f1": 0.8950965612777054,
+    "contact_accuracy": 0.8909482758620689,
+    "rollouts": 58.5
+  },
+  "fold_std_groups": {
+    "ee_position": {
+      "one_step_rmse": 0.0003667003286656333,
+      "persistence_one_step_rmse": 3.917520243164815e-05,
+      "normalized_one_step_rmse": 0.003975211182417116,
+      "world_model_rmse": 0.005171941750790742,
+      "persistence_rmse": 0.0010833593381270948
+    },
+    "arm_position": {
+      "one_step_rmse": 0.0005113210472390265,
+      "persistence_one_step_rmse": 0.0002553306037678745,
+      "normalized_one_step_rmse": 0.003423166274389577,
+      "world_model_rmse": 0.007609373485515945,
+      "persistence_rmse": 0.00562453811314367
+    },
+    "arm_velocity": {
+      "one_step_rmse": 0.0009227815494333814,
+      "persistence_one_step_rmse": 0.0006732917753022311,
+      "normalized_one_step_rmse": 0.03405049452689157,
+      "world_model_rmse": 0.0019990756238880544,
+      "persistence_rmse": 0.0046016569590324906
+    },
+    "package_position": {
+      "one_step_rmse": 0.00021325175978745137,
+      "persistence_one_step_rmse": 0.0005671081302208015,
+      "normalized_one_step_rmse": 0.005691697940446685,
+      "world_model_rmse": 0.004776668175249731,
+      "persistence_rmse": 0.009365434427834357
+    },
+    "package_orientation": {
+      "one_step_rmse": 0.0052586100452907915,
+      "persistence_one_step_rmse": 0.00414102786719947,
+      "normalized_one_step_rmse": 0.017729566532291016,
+      "world_model_rmse": 0.03752499261717616,
+      "persistence_rmse": 0.0260823226466201
+    },
+    "package_linear_velocity": {
+      "one_step_rmse": 0.007882101994920277,
+      "persistence_one_step_rmse": 0.007522131253180274,
+      "normalized_one_step_rmse": 0.08469530412855118,
+      "world_model_rmse": 0.004690465245074148,
+      "persistence_rmse": 0.007183225866273937
+    },
+    "package_angular_velocity": {
+      "one_step_rmse": 0.15389771584019718,
+      "persistence_one_step_rmse": 0.15389771584019718,
+      "normalized_one_step_rmse": 0.5796401664300835,
+      "world_model_rmse": 0.38259583523271373,
+      "persistence_rmse": 0.38259583523271373
+    },
+    "gripper_aperture": {
+      "one_step_rmse": 0.0004957360588169854,
+      "persistence_one_step_rmse": 0.0002962501673421845,
+      "normalized_one_step_rmse": 0.026119775205481362,
+      "world_model_rmse": 0.004073739928749171,
+      "persistence_rmse": 0.0033475656066981304
+    },
+    "gripper_velocity": {
+      "one_step_rmse": 0.006127933536124308,
+      "persistence_one_step_rmse": 0.00427495172647343,
+      "normalized_one_step_rmse": 0.17545360504128463,
+      "world_model_rmse": 0.020733359902251104,
+      "persistence_rmse": 0.03665311005130919
+    },
+    "tray_center": {
+      "one_step_rmse": 0.0,
+      "persistence_one_step_rmse": 0.0,
+      "normalized_one_step_rmse": 0.0,
+      "world_model_rmse": 0.0,
+      "persistence_rmse": 0.0
+    },
+    "contact_f1": 0.048357193985808164,
+    "contact_accuracy": 0.04789528249851302,
+    "rollouts": 0.8660254037844386
+  },
+  "total_outer_test_rollouts": 234,
+  "evaluation_protocol": "Four outer folds grouped by source video; each fold uses a separate grouped inner validation split for early stopping. Direct and confidence-aware rows for the same source video stay together.",
+  "limitations": "Simulation-derived transitions; results are a proxy for task dynamics and do not establish physical-robot performance.",
+  "model": {
+    "architecture": "5-member MLP ensemble",
+    "hidden_dim": 128,
+    "training_epochs_max": 100,
+    "rollout_loss_steps": [
+      1,
+      5,
+      25
+    ],
+    "residual_gain_calibration": "Selected per state group using inner validation rollouts only; outer test clips are excluded."
+  },
+  "dataset": {
+    "source_videos": 16,
+    "transitions": 6139,
+    "replays_per_video": 2,
+    "transition_source": "MuJoCo simulation driven by retargeted recorded human hand paths"
+  },
+  "training_protocol": {
+    "outer_folds": 4,
+    "clips_per_outer_fold": 4,
+    "inner_validation_fraction": 0.25,
+    "grouping": "Source video; direct and confidence-aware replays kept in the same group."
+  },
+  "interpretation": "Across outer folds the model improves position, arm velocity, package orientation, gripper aperture, gripper velocity, and contact classification versus persistence. Package linear velocity remains slightly worse; package angular velocity uses the validation-selected persistence fallback. Simulation results do not establish real-robot performance."
+}
