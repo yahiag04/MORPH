@@ -87,4 +87,4 @@
 - [x] Publish a compact table for robot task success by human label and world-model held-out error versus persistence; clearly state episode counts and simulation-proxy limits.
 - [x] Document installation of the optional model environment, local layout JSON format, training/evaluation commands, and the local paired-demo command.
 - [x] Run all core tests and optional world-model tests, verify documented CLI commands with `--help`, inspect staged files for personal data, and scan the public tree/commit messages for development-tool references.
-- [ ] Commit as `docs: publish contact task and world model results` and push to `main` after final review.
+- [x] Commit as `docs: publish contact task and world model results` and push to `main` after final review (`23f108e`, pushed to `origin/main`).
