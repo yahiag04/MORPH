@@ -17,15 +17,21 @@ from world_model.state_dynamics import (
     calibrate_rollout_gains, evaluate_state_dynamics, fit_state_dynamics,
     load_checkpoint, save_checkpoint,
 )
+from world_model.transition_timing import transition_interval
 
 
-def _load_pair(path: Path, method: str) -> dict[str, np.ndarray]:
+def _load_pair(path: Path, method: str, legacy_interval: float | None = None) -> dict:
     with np.load(path, allow_pickle=False) as archive:
         required = ("states", "actions", "next_states", "clip_ids")
         missing = set(required) - set(archive.files)
         if missing:
             raise ValueError(f"{path} is missing arrays: {sorted(missing)}")
+        if (("splits" in archive and np.any(archive["splits"] != "unassigned")) or
+                ("source_kinds" in archive and np.any(archive["source_kinds"] != "human_replay"))):
+            raise ValueError("use the predefined scenario partitions for synthetic data; video splitting is not applicable")
         data = {key: archive[key] for key in required}
+        data["dt_seconds"] = transition_interval(archive.get("transition_dt_seconds"),
+                                                count=len(data["states"]), legacy_interval=legacy_interval)
     data["clip_ids"] = data["clip_ids"].astype(str)
     data["episode_ids"] = np.char.add(data["clip_ids"], f":{method}")
     return data
@@ -57,14 +63,19 @@ def main() -> int:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--epochs", type=int, default=220)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--transition-dt-seconds", type=float,
+                        help="explicit interval for legacy archives without timing metadata")
     args = parser.parse_args()
     output_dir = args.output_dir.expanduser().resolve()
     if output_dir == ROOT or ROOT in output_dir.parents:
         parser.error("--output-dir must be outside the repository")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    direct = _load_pair(args.direct_transitions.expanduser(), "direct")
-    confidence = _load_pair(args.confidence_transitions.expanduser(), "confidence-aware")
+    direct = _load_pair(args.direct_transitions.expanduser(), "direct", args.transition_dt_seconds)
+    confidence = _load_pair(args.confidence_transitions.expanduser(), "confidence-aware", args.transition_dt_seconds)
+    if not np.isclose(direct["dt_seconds"], confidence["dt_seconds"], rtol=1e-7, atol=1e-9):
+        parser.error("both transition archives must have the same observation interval")
+    transition_dt = direct["dt_seconds"]
     data = _merge((direct, confidence))
     unique_clips = np.unique(data["clip_ids"])
     if len(unique_clips) < 4:
@@ -83,6 +94,7 @@ def main() -> int:
                 data["next_states"][train_mask], data["clip_ids"][train_mask],
                 episode_ids=data["episode_ids"][train_mask], epochs=args.epochs,
                 seed=args.seed + fold_index,
+                transition_dt_seconds=transition_dt,
             )
         inner_validation_mask = np.isin(data["clip_ids"][train_mask], fit.validation_clip_ids)
         calibrate_rollout_gains(
@@ -98,6 +110,7 @@ def main() -> int:
             fit, data["states"][test_mask], data["actions"][test_mask],
             data["next_states"][test_mask], data["clip_ids"][test_mask],
             episode_ids=data["episode_ids"][test_mask],
+            transition_dt_seconds=transition_dt,
         )
         fold_results.append({
             "fold": fold_index + 1,
@@ -122,7 +135,8 @@ def main() -> int:
     report = {
         "state_dim": 37, "action_dim": 4, "outer_fold_count": 4,
         "source_clip_count": len(unique_clips), "transition_count": len(data["states"]),
-        "rollout_horizon_steps": 25, "rollout_seconds": 0.5,
+        "rollout_horizon_steps": 25, "rollout_seconds": 25 * transition_dt,
+        "transition_dt_seconds": transition_dt,
         "fold_mean_groups": _aggregate(fold_results, group_keys),
         "fold_std_groups": {
             group: ({metric: float(np.std([fold["groups"][group][metric] for fold in fold_results]))

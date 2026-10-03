@@ -90,6 +90,8 @@ def main() -> int:
                         metavar=("X_MIN", "X_MAX", "Y_MIN", "Y_MAX"))
     parser.add_argument("--control-hz", type=float, default=10.0)
     parser.add_argument("--simulation-steps-per-sample", type=int, default=50)
+    parser.add_argument("--observation-steps", type=int, default=10,
+                        help="physics steps between observations; must divide the controller interval")
     parser.add_argument("--confidence", type=float, default=0.5)
     args = parser.parse_args()
     repo_root = Path(__file__).resolve().parents[1]
@@ -178,19 +180,13 @@ def main() -> int:
                 run = evaluate_contact_trajectory(
                     trajectory, pickup, dropoff, human_label=label,
                     model_path=args.model_path, simulation_steps_per_sample=args.simulation_steps_per_sample,
+                    observation_steps=args.observation_steps,
                 )
                 run["clip_id"] = clip_id
                 run["method"] = method
                 run["control_sample_count"] = int(len(trajectory))
-                transitions = run["transitions"]
-                states = np.asarray([row["state"] for row in transitions], dtype=np.float32).reshape(-1, 37)
-                actions = np.asarray([row["action"] for row in transitions], dtype=np.float32).reshape(-1, 4)
-                next_states = np.asarray([row["next_state"] for row in transitions], dtype=np.float32).reshape(-1, 37)
-                phases = [row["phase"] for row in transitions]
-                np.savez_compressed(clip_output / f"{method}_transitions.npz", states=states,
-                                    actions=actions, next_states=next_states, phases=np.asarray(phases),
-                                    clip_ids=np.full(len(states), clip_id),
-                                    method=np.full(len(states), method))
+                run["episode_id"] = f"{clip_id}:{method}"
+                write_transition_archive([run], clip_output / f"{method}_transitions.npz")
                 (clip_output / f"{method}_summary.json").write_text(json.dumps(
                     {k: v for k, v in run.items() if k not in {"final_package_xyz", "transitions"}}, indent=2) + "\n", encoding="utf-8")
             except (ValueError, OSError, RuntimeError) as error:

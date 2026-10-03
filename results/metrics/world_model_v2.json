@@ -5,7 +5,7 @@
   "source_clip_count": 16,
   "transition_count": 6139,
   "rollout_horizon_steps": 25,
-  "rollout_seconds": 0.5,
+  "rollout_seconds": 2.5,
   "fold_mean_groups": {
     "ee_position": {
       "normalized_one_step_rmse": 0.031409104157570956,
@@ -182,5 +182,12 @@
     "inner_validation_fraction": 0.25,
     "grouping": "Source video; direct and confidence-aware replays kept in the same group."
   },
-  "interpretation": "Across outer folds the model improves position, arm velocity, package orientation, gripper aperture, gripper velocity, and contact classification versus persistence. Package linear velocity remains slightly worse; package angular velocity uses the validation-selected persistence fallback. Simulation results do not establish real-robot performance."
+  "interpretation": "Across outer folds the model improves position, arm velocity, package orientation, gripper aperture, gripper velocity, and contact classification versus persistence. Package linear velocity remains slightly worse; package angular velocity uses the validation-selected persistence fallback. Simulation results do not establish real-robot performance.",
+  "transition_dt_seconds": 0.1,
+  "timing_audit": {
+    "physics_timestep_seconds": 0.002,
+    "physics_steps_per_transition": 50,
+    "previous_incorrect_rollout_seconds": 0.5,
+    "correction": "The original V2 collection used the replay CLI default of 50 physics steps per archived transition. Metrics are unchanged; 25 transitions span 2.5 seconds."
+  }
 }

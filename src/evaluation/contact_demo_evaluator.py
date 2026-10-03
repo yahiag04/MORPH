@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from copy import copy
 from pathlib import Path
 
 import mujoco
 import numpy as np
 
-from simulation.contact_manipulation_env import ContactManipulationEnv
+from simulation.contact_manipulation_env import ContactManipulationEnv, ContactTaskConfig
 from simulation.demonstration_manipulation import run_demonstration_manipulation
 from simulation.ik import ARM_JOINT_NAMES
 from simulation.panda_env import DEFAULT_MODEL_PATH
@@ -18,8 +19,20 @@ STATE_DIM = 37
 ACTION_DIM = 4
 
 
-def contact_task_state(env: ContactManipulationEnv) -> np.ndarray:
-    """Return the ordered 37-value Markov state used by dynamics training."""
+def contact_task_state(env: ContactManipulationEnv, *, observation_data: mujoco.MjData | None = None) -> np.ndarray:
+    """Read a coherent 37-value observation without touching the live solver.
+
+    After mj_step, derived positions and contacts still describe the preceding
+    physics step. Refresh them on a snapshot at the current qpos/qvel/time.
+    Callers collecting many observations can reuse the scratch MjData.
+    """
+    if observation_data is env.data:
+        raise ValueError('observation_data must be separate from live simulation data')
+    snapshot = copy(env)
+    snapshot.data = observation_data if observation_data is not None else mujoco.MjData(env.model)
+    mujoco.mj_copyData(snapshot.data, env.model, env.data)
+    mujoco.mj_forward(env.model, snapshot.data)
+    env = snapshot
     arm_qpos = []
     arm_qvel = []
     for name in ARM_JOINT_NAMES:
@@ -53,6 +66,13 @@ def evaluate_contact_trajectory(
     human_label: str,
     model_path: str | Path | None = None,
     simulation_steps_per_sample: int = 10,
+    observation_steps: int | None = None,
+    config: ContactTaskConfig | None = None,
+    heights: dict[str, float] | None = None,
+    cartesian_speed_mps: float = 0.08,
+    release_open_fraction: float = 0.0,
+    controller_pickup_xy: np.ndarray | None = None,
+    controller_dropoff_xy: np.ndarray | None = None,
 ) -> dict:
     """Run one fresh simulation and return outcome plus state/action transitions."""
     trajectory = np.asarray(trajectory_xyz, dtype=np.float64)
@@ -65,33 +85,47 @@ def evaluate_contact_trajectory(
         model_path=model,
         pickup_xyz=(float(pickup[0]), float(pickup[1]), 0.412),
         dropoff_xyz=(float(dropoff[0]), float(dropoff[1]), 0.416),
+        config=config,
     )
-    initial_state = contact_task_state(env)
-    after: list[np.ndarray] = []
-    actions: list[np.ndarray] = []
-
-    def record(row: dict) -> None:
-        state = contact_task_state(env)
-        target = np.asarray(row["target_xyz"], dtype=np.float32)
-        command = 0.0 if row["gripper_command"] == "close" else 0.08
-        actions.append(np.concatenate((target, np.asarray((command,), dtype=np.float32))))
-        after.append(state.copy())
-
-    result = run_demonstration_manipulation(
-        env, trajectory, pickup, dropoff, on_control_step=record,
-        simulation_steps_per_sample=simulation_steps_per_sample,
-    )
+    observation_data = mujoco.MjData(env.model)
+    initial_state = contact_task_state(env, observation_data=observation_data)
     transitions = []
     previous = initial_state
-    for action, following, log in zip(actions, after, result["transitions"], strict=True):
-        transitions.append({"state": previous, "action": action, "next_state": following,
-                            "phase": log["phase"], "timestamp": log["timestamp"]})
-        previous = following
+
+    def record(row: dict) -> None:
+        nonlocal previous
+        state = contact_task_state(env, observation_data=observation_data)
+        target = np.asarray(row["target_xyz"], dtype=np.float32)
+        command = 0.0 if row["gripper_command"] == "close" else 0.08
+        transitions.append({
+            "state": previous, "next_state": state.copy(),
+            "action": np.concatenate((target, np.asarray((command,), dtype=np.float32))),
+            "actuator_controls": row["actuator_controls"].copy(),
+            "simulation_start_time": row["simulation_start_time"],
+            "simulation_end_time": row["simulation_end_time"],
+            "dt_seconds": row["simulation_end_time"] - row["simulation_start_time"],
+            "timestamp": row["simulation_end_time"], "human_timestamp": row["human_timestamp"],
+            "phase": row["phase"],
+        })
+        previous = state.copy()
+
+    result = run_demonstration_manipulation(
+        env, trajectory,
+        pickup if controller_pickup_xy is None else controller_pickup_xy,
+        dropoff if controller_dropoff_xy is None else controller_dropoff_xy,
+        on_observation=record, observation_steps=observation_steps,
+        simulation_steps_per_sample=simulation_steps_per_sample,
+        heights=heights, cartesian_speed_mps=cartesian_speed_mps,
+        release_open_fraction=release_open_fraction,
+    )
     return {
         "human_label": str(human_label), "robot_success": bool(result["success"]),
         "failure_reason": result["failure_reason"], "max_lift_m": result["max_lift_m"],
         "stable_in_tray": result["stable_in_tray"], "ik_failures": result["ik_failures"],
-        "steps": result["steps"], "transitions": transitions,
+        "steps": len(transitions), "control_steps": result["steps"], "transitions": transitions,
+        "physics_timestep_seconds": float(env.model.opt.timestep),
+        "control_dt_seconds": float(env.model.opt.timestep * simulation_steps_per_sample),
+        "observation_dt_seconds": float(env.model.opt.timestep * (observation_steps or simulation_steps_per_sample)),
         "final_package_xyz": env.get_package_position(),
     }
 
@@ -138,6 +172,8 @@ def write_transition_archive(runs: list[dict], destination: str | Path) -> None:
     clip_ids: list[str] = []
     labels: list[str] = []
     phases: list[str] = []
+    controls, starts, ends, intervals = [], [], [], []
+    episodes, groups, sources, splits = [], [], [], []
     for run in runs:
         for transition in run.get("transitions", []):
             states.append(transition["state"])
@@ -146,9 +182,24 @@ def write_transition_archive(runs: list[dict], destination: str | Path) -> None:
             clip_ids.append(str(run["clip_id"]))
             labels.append(str(run["human_label"]))
             phases.append(str(transition["phase"]))
+            controls.append(transition["actuator_controls"])
+            starts.append(transition["simulation_start_time"])
+            ends.append(transition["simulation_end_time"])
+            intervals.append(transition["dt_seconds"])
+            episodes.append(str(run.get("episode_id", run["clip_id"])))
+            groups.append(str(run.get("group_id", run["clip_id"])))
+            sources.append(str(run.get("source_kind", "human_replay")))
+            splits.append(str(run.get("split", "unassigned")))
     np.savez_compressed(
         Path(destination), states=np.asarray(states, dtype=np.float32).reshape(-1, STATE_DIM),
         actions=np.asarray(actions, dtype=np.float32).reshape(-1, ACTION_DIM),
         next_states=np.asarray(next_states, dtype=np.float32).reshape(-1, STATE_DIM),
         clip_ids=np.asarray(clip_ids), human_labels=np.asarray(labels), phases=np.asarray(phases),
+        actuator_controls=np.asarray(controls, dtype=np.float64).reshape(-1, 8),
+        simulation_start_times=np.asarray(starts, dtype=np.float64),
+        simulation_end_times=np.asarray(ends, dtype=np.float64),
+        transition_dt_seconds=np.asarray(intervals, dtype=np.float64),
+        episode_ids=np.asarray(episodes, dtype=str), group_ids=np.asarray(groups, dtype=str),
+        source_kinds=np.asarray(sources, dtype=str), splits=np.asarray(splits, dtype=str),
+        archive_schema_version=np.asarray(3, dtype=np.int32),
     )

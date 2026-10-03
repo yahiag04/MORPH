@@ -20,8 +20,11 @@ def run_demonstration_manipulation(
     heights: dict[str, float] | None = None,
     radii: dict[str, float] | None = None,
     on_control_step: Callable[[dict], None] | None = None,
+    on_observation: Callable[[dict], None] | None = None,
+    observation_steps: int | None = None,
     simulation_steps_per_sample: int = 10,
     cartesian_speed_mps: float = 0.08,
+    release_open_fraction: float = 0.0,
 ) -> dict:
     """Replay timestamped Cartesian samples with inferred grasp/place phases.
 
@@ -39,8 +42,14 @@ def run_demonstration_manipulation(
         raise ValueError("trajectory timestamps must be strictly increasing")
     if pickup.shape != (2,) or dropoff.shape != (2,) or not np.isfinite(pickup).all() or not np.isfinite(dropoff).all():
         raise ValueError("pickup_xy and dropoff_xy must be finite XY points")
-    if simulation_steps_per_sample < 1:
+    if not isinstance(simulation_steps_per_sample, (int, np.integer)) or simulation_steps_per_sample < 1:
         raise ValueError("simulation_steps_per_sample must be positive")
+    observation_steps = simulation_steps_per_sample if observation_steps is None else observation_steps
+    if (not isinstance(observation_steps, (int, np.integer)) or observation_steps < 1
+            or simulation_steps_per_sample % observation_steps):
+        raise ValueError("observation_steps must be a positive integer and divide simulation_steps_per_sample")
+    if not np.isfinite(release_open_fraction) or not 0 <= release_open_fraction <= 1:
+        raise ValueError("release_open_fraction must be between zero and one")
     if not np.isfinite(cartesian_speed_mps) or cartesian_speed_mps <= 0:
         raise ValueError("cartesian_speed_mps must be finite and positive")
 
@@ -73,31 +82,53 @@ def run_demonstration_manipulation(
             env.data.ctrl[actuator_id] = arm_target[index]
         return bool(ik.converged), float(ik.position_error)
 
-    def control_to(target_xyz: np.ndarray, control_phase: str, command: str, timestamp: float) -> None:
+    def advance(target_xyz, control_phase, command, timestamp, converged, ik_error,
+                *, track_offset=True):
         nonlocal max_lift, failure, package_ee_offset
+        observation_start = float(env.data.time)
+        controls = env.data.ctrl.copy()
+        for substep in range(1, simulation_steps_per_sample + 1):
+            env.step()
+            current_package = env.get_package_position()
+            current_z = float(current_package[2])
+            max_lift = max(max_lift, current_z - initial_package_z)
+            if track_offset and package_ee_offset is None and current_z - initial_package_z >= 0.05:
+                package_ee_offset = current_package[:2] - env.get_end_effector_position()[:2]
+            if substep % observation_steps == 0:
+                if on_observation is not None:
+                    on_observation({
+                        "simulation_start_time": observation_start,
+                        "simulation_end_time": float(env.data.time),
+                        "human_timestamp": float(timestamp), "phase": control_phase,
+                        "target_xyz": target_xyz.copy(), "gripper_command": command,
+                        "actuator_controls": controls.copy(),
+                        "ik_converged": converged, "ik_error_m": ik_error,
+                    })
+                observation_start = float(env.data.time)
+
+    def control_to(target_xyz: np.ndarray, control_phase: str, command: str, timestamp: float) -> None:
+        nonlocal failure
         start = env.get_end_effector_position()
         distance = float(np.linalg.norm(target_xyz - start))
         control_dt = float(env.model.opt.timestep) * simulation_steps_per_sample
         intervals = max(1, int(np.ceil(distance / (cartesian_speed_mps * control_dt))))
         env.close_gripper() if command == "close" else env.open_gripper()
         for index in range(1, intervals + 1):
+            interval_command = command
+            if control_phase == "release" and release_open_fraction > 0:
+                interval_command = "open" if index / intervals >= release_open_fraction else "close"
+                env.open_gripper() if interval_command == "open" else env.close_gripper()
             interpolated = start + (target_xyz - start) * (index / intervals)
             converged, ik_error = command_arm(interpolated)
             if not converged and failure is None:
                 failure = "ik_not_converged"
-            for _ in range(simulation_steps_per_sample):
-                env.step()
-                current_package = env.get_package_position()
-                current_z = float(current_package[2])
-                max_lift = max(max_lift, current_z - initial_package_z)
-                if package_ee_offset is None and current_z - initial_package_z >= 0.05:
-                    package_ee_offset = current_package[:2] - env.get_end_effector_position()[:2]
+            advance(interpolated, control_phase, interval_command, timestamp, converged, ik_error)
             log = {
                 "timestamp": timestamp + index * control_dt,
                 "phase": control_phase,
                 "target_xyz": interpolated.copy(),
                 "actual_xyz": env.get_end_effector_position().copy(),
-                "gripper_command": command,
+                "gripper_command": interval_command,
                 "package_xyz": env.get_package_position(),
                 "package_linear_velocity": env.get_package_linear_velocity(),
                 "package_gripper_contact": env.package_has_gripper_contact(),
@@ -144,9 +175,8 @@ def run_demonstration_manipulation(
             release_target = np.array((release_xy[0], release_xy[1], heights["release"]), dtype=np.float64)
             control_to(release_target, "release", "open", float(timestamp))
             for _ in range(max(10, int(round(0.4 / (env.model.opt.timestep * simulation_steps_per_sample))))):
-                for _ in range(simulation_steps_per_sample):
-                    env.step()
-                    max_lift = max(max_lift, float(env.get_package_position()[2]) - initial_package_z)
+                advance(release_target, "settle", "open", timestamp,
+                        logs[-1]["ik_converged"], logs[-1]["ik_error_m"], track_offset=False)
             phase = "complete"
             break
 

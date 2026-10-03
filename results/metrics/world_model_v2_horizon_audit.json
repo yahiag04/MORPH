@@ -1,0 +1,803 @@
+{
+  "source": "Archived calibrated V2 checkpoints; no retraining or recalibration",
+  "transition_dt_seconds": 0.1,
+  "aggregation": "Equal-weight mean of four source-video folds",
+  "sampling": "Non-overlapping windows per episode for each horizon; different horizons have different endpoint subsets.",
+  "horizons": [
+    {
+      "steps": 5,
+      "seconds": 0.5,
+      "total_rollouts": 1220,
+      "fold_mean": {
+        "contact_accuracy": 0.9432204364608768,
+        "contact_f1": 0.9445300561841984,
+        "persistence_contact_accuracy": 0.9568908879544907,
+        "persistence_contact_f1": 0.9578218859876592,
+        "zero_linear_velocity_rmse": 0.033590718638151884,
+        "zero_angular_velocity_rmse": 0.729709692299366,
+        "groups": {
+          "ee_position": {
+            "world_model_rmse": 0.010521580131152883,
+            "persistence_rmse": 0.017929188031124067
+          },
+          "arm_position": {
+            "world_model_rmse": 0.017111793594036938,
+            "persistence_rmse": 0.025341945241517113
+          },
+          "arm_velocity": {
+            "world_model_rmse": 0.023331888789198292,
+            "persistence_rmse": 0.023706169927460878
+          },
+          "package_position": {
+            "world_model_rmse": 0.015499650183575402,
+            "persistence_rmse": 0.016047130549789543
+          },
+          "package_orientation": {
+            "world_model_rmse": 0.07027188539235424,
+            "persistence_rmse": 0.07517394190548995
+          },
+          "package_linear_velocity": {
+            "world_model_rmse": 0.04117157025054122,
+            "persistence_rmse": 0.04361149530627118
+          },
+          "package_angular_velocity": {
+            "world_model_rmse": 1.0217971296636865,
+            "persistence_rmse": 1.0217971296636865
+          },
+          "gripper_aperture": {
+            "world_model_rmse": 0.010072627419411373,
+            "persistence_rmse": 0.01660036474875761
+          },
+          "gripper_velocity": {
+            "world_model_rmse": 0.028107568276979925,
+            "persistence_rmse": 0.028397783771523216
+          },
+          "tray_center": {
+            "world_model_rmse": 0.0,
+            "persistence_rmse": 0.0
+          }
+        }
+      },
+      "folds": [
+        {
+          "fold": 1,
+          "rollouts": 298,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.006866699123767786,
+              "persistence_rmse": 0.017661055134249752
+            },
+            "arm_position": {
+              "world_model_rmse": 0.010761211423447322,
+              "persistence_rmse": 0.023526147723458575
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.018001174092370804,
+              "persistence_rmse": 0.02324654894819466
+            },
+            "package_position": {
+              "world_model_rmse": 0.011056180250217046,
+              "persistence_rmse": 0.017186696075858758
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.05927455816646534,
+              "persistence_rmse": 0.07727927632315318
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.01787841035666904,
+              "persistence_rmse": 0.01787841035666904
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 0.5735355381829522,
+              "persistence_rmse": 0.5735355381829522
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.007703092581207914,
+              "persistence_rmse": 0.016563971540768534
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.02700548119654919,
+              "persistence_rmse": 0.029692226143951613
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.9798657718120806,
+          "contact_f1": 0.9803921568627451,
+          "persistence_contact_accuracy": 0.9530201342281879,
+          "persistence_contact_f1": 0.954248366013072,
+          "zero_linear_velocity_rmse": 0.016670243814587593,
+          "zero_angular_velocity_rmse": 0.42413729429244995
+        },
+        {
+          "fold": 2,
+          "rollouts": 324,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.019331232170156212,
+              "persistence_rmse": 0.017663436043039566
+            },
+            "arm_position": {
+              "world_model_rmse": 0.031655170872178395,
+              "persistence_rmse": 0.0267286708134968
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.03503341120051628,
+              "persistence_rmse": 0.02459814110706601
+            },
+            "package_position": {
+              "world_model_rmse": 0.022441911225566567,
+              "persistence_rmse": 0.01585236604463682
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.08202736336961017,
+              "persistence_rmse": 0.08116320223038112
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.03475079512398061,
+              "persistence_rmse": 0.03475079512398061
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 2.036565078230494,
+              "persistence_rmse": 2.036565078230494
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.012039171818209791,
+              "persistence_rmse": 0.014597490758395375
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.034812840376267556,
+              "persistence_rmse": 0.024534446734445246
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.9598765432098766,
+          "contact_f1": 0.9611940298507463,
+          "persistence_contact_accuracy": 0.9629629629629629,
+          "persistence_contact_f1": 0.9636363636363636,
+          "zero_linear_velocity_rmse": 0.027496755123138428,
+          "zero_angular_velocity_rmse": 1.4388796091079712
+        },
+        {
+          "fold": 3,
+          "rollouts": 302,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.006884089459537027,
+              "persistence_rmse": 0.018222621020819566
+            },
+            "arm_position": {
+              "world_model_rmse": 0.011045495795198644,
+              "persistence_rmse": 0.02484028706731551
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.017679440864496875,
+              "persistence_rmse": 0.02353903747379113
+            },
+            "package_position": {
+              "world_model_rmse": 0.015517739985720324,
+              "persistence_rmse": 0.018632042807311507
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.08773574976845992,
+              "persistence_rmse": 0.0899160735447156
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.018243466257830927,
+              "persistence_rmse": 0.018243466257830927
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 0.5267285659010025,
+              "persistence_rmse": 0.5267285659010025
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.006883936239017249,
+              "persistence_rmse": 0.0163379610542397
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.03453005519821148,
+              "persistence_rmse": 0.043360854121074294
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.9817880794701986,
+          "contact_f1": 0.9822294022617124,
+          "persistence_contact_accuracy": 0.945364238410596,
+          "persistence_contact_f1": 0.946515397082658,
+          "zero_linear_velocity_rmse": 0.01696641370654106,
+          "zero_angular_velocity_rmse": 0.37879034876823425
+        },
+        {
+          "fold": 4,
+          "rollouts": 296,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.009004299771150503,
+              "persistence_rmse": 0.01816963992638739
+            },
+            "arm_position": {
+              "world_model_rmse": 0.01498529628532338,
+              "persistence_rmse": 0.026272675361797577
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.022613528999409223,
+              "persistence_rmse": 0.023440952180791712
+            },
+            "package_position": {
+              "world_model_rmse": 0.012982769272797668,
+              "persistence_rmse": 0.012517417271351083
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.052049870264881504,
+              "persistence_rmse": 0.05233721552370991
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.0938136092636843,
+              "persistence_rmse": 0.10357330948660415
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 0.9503593363402973,
+              "persistence_rmse": 0.9503593363402973
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.013664309039210537,
+              "persistence_rmse": 0.018902035641626833
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.016081896336891475,
+              "persistence_rmse": 0.016003608086621716
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.8513513513513513,
+          "contact_f1": 0.8543046357615894,
+          "persistence_contact_accuracy": 0.9662162162162162,
+          "persistence_contact_f1": 0.9668874172185431,
+          "zero_linear_velocity_rmse": 0.07322946190834045,
+          "zero_angular_velocity_rmse": 0.6770315170288086
+        }
+      ]
+    },
+    {
+      "steps": 10,
+      "seconds": 1.0,
+      "total_rollouts": 598,
+      "fold_mean": {
+        "contact_accuracy": 0.9252036925624254,
+        "contact_f1": 0.9265683216730758,
+        "persistence_contact_accuracy": 0.9163614813443581,
+        "persistence_contact_f1": 0.917494459131085,
+        "zero_linear_velocity_rmse": 0.04312909836880863,
+        "zero_angular_velocity_rmse": 0.8702139053493738,
+        "groups": {
+          "ee_position": {
+            "world_model_rmse": 0.020770972326719227,
+            "persistence_rmse": 0.034612991197454826
+          },
+          "arm_position": {
+            "world_model_rmse": 0.030935748932705544,
+            "persistence_rmse": 0.048790740258790016
+          },
+          "arm_velocity": {
+            "world_model_rmse": 0.026626776912404008,
+            "persistence_rmse": 0.03186634187325735
+          },
+          "package_position": {
+            "world_model_rmse": 0.028134564818894515,
+            "persistence_rmse": 0.02619271453301035
+          },
+          "package_orientation": {
+            "world_model_rmse": 0.10191056425232421,
+            "persistence_rmse": 0.11020296084670617
+          },
+          "package_linear_velocity": {
+            "world_model_rmse": 0.05177406178134051,
+            "persistence_rmse": 0.05795279800773004
+          },
+          "package_angular_velocity": {
+            "world_model_rmse": 1.2257390502263745,
+            "persistence_rmse": 1.2257390502263745
+          },
+          "gripper_aperture": {
+            "world_model_rmse": 0.01354331365978206,
+            "persistence_rmse": 0.023929286852933523
+          },
+          "gripper_velocity": {
+            "world_model_rmse": 0.04287836613565064,
+            "persistence_rmse": 0.03247954733816155
+          },
+          "tray_center": {
+            "world_model_rmse": 0.0,
+            "persistence_rmse": 0.0
+          }
+        }
+      },
+      "folds": [
+        {
+          "fold": 1,
+          "rollouts": 146,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.011273787420680645,
+              "persistence_rmse": 0.03423867192127992
+            },
+            "arm_position": {
+              "world_model_rmse": 0.01717327626793001,
+              "persistence_rmse": 0.04555949368689434
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.01948506690055891,
+              "persistence_rmse": 0.03296783653629613
+            },
+            "package_position": {
+              "world_model_rmse": 0.015094214797723908,
+              "persistence_rmse": 0.028503800051099832
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.0836643915609474,
+              "persistence_rmse": 0.11704302891209903
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.02037995012441756,
+              "persistence_rmse": 0.02037995012441756
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 0.5645593772242204,
+              "persistence_rmse": 0.5645593772242204
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.008270055765612495,
+              "persistence_rmse": 0.024441317795469143
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.024824145982321237,
+              "persistence_rmse": 0.018951773958700353
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.958904109589041,
+          "contact_f1": 0.9594594594594594,
+          "persistence_contact_accuracy": 0.9041095890410958,
+          "persistence_contact_f1": 0.9041095890410958,
+          "zero_linear_velocity_rmse": 0.0170279648154974,
+          "zero_angular_velocity_rmse": 0.40191131830215454
+        },
+        {
+          "fold": 2,
+          "rollouts": 160,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.04421676452794462,
+              "persistence_rmse": 0.03429880009351899
+            },
+            "arm_position": {
+              "world_model_rmse": 0.061765186336055974,
+              "persistence_rmse": 0.051394729828939764
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.04332450250779734,
+              "persistence_rmse": 0.034153381136943405
+            },
+            "package_position": {
+              "world_model_rmse": 0.052074087166641574,
+              "persistence_rmse": 0.026199081760639963
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.12313975090403759,
+              "persistence_rmse": 0.11909085638639993
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.049483721178655606,
+              "persistence_rmse": 0.049483721178655606
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 2.893135182019183,
+              "persistence_rmse": 2.893135182019183
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.02154196097413185,
+              "persistence_rmse": 0.020325448186823702
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.08220322318450513,
+              "persistence_rmse": 0.03333899643271816
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.95625,
+          "contact_f1": 0.9575757575757575,
+          "persistence_contact_accuracy": 0.925,
+          "persistence_contact_f1": 0.9259259259259259,
+          "zero_linear_velocity_rmse": 0.03702149540185928,
+          "zero_angular_velocity_rmse": 2.0436694622039795
+        },
+        {
+          "fold": 3,
+          "rollouts": 148,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.011038934087462532,
+              "persistence_rmse": 0.03494464446939967
+            },
+            "arm_position": {
+              "world_model_rmse": 0.016306408152383982,
+              "persistence_rmse": 0.047670337367252846
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.01779120005211033,
+              "persistence_rmse": 0.03101804565623913
+            },
+            "package_position": {
+              "world_model_rmse": 0.023850359055088585,
+              "persistence_rmse": 0.03010464013996139
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.12371837147229436,
+              "persistence_rmse": 0.12806034081817372
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.015467734707889638,
+              "persistence_rmse": 0.015467734707889638
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 0.08283208628846256,
+              "persistence_rmse": 0.08283208628846256
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.008305351674895193,
+              "persistence_rmse": 0.02356960060013071
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.044773010845658254,
+              "persistence_rmse": 0.06194144753352593
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.9662162162162162,
+          "contact_f1": 0.9673202614379085,
+          "persistence_contact_accuracy": 0.8918918918918919,
+          "persistence_contact_f1": 0.8947368421052632,
+          "zero_linear_velocity_rmse": 0.013829116709530354,
+          "zero_angular_velocity_rmse": 0.06583181768655777
+        },
+        {
+          "fold": 4,
+          "rollouts": 144,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.016554403270789105,
+              "persistence_rmse": 0.03496984830562074
+            },
+            "arm_position": {
+              "world_model_rmse": 0.028498124974452203,
+              "persistence_rmse": 0.0505384001520731
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.025906338189149464,
+              "persistence_rmse": 0.02932610416355073
+            },
+            "package_position": {
+              "world_model_rmse": 0.021519598256123994,
+              "persistence_rmse": 0.019963336180340217
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.07711974307201745,
+              "persistence_rmse": 0.076617617270152
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.12176484111439924,
+              "persistence_rmse": 0.14647978601995737
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 1.3624295553736328,
+              "persistence_rmse": 1.3624295553736328
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.016055886224488704,
+              "persistence_rmse": 0.027380780829310537
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.019713084530117903,
+              "persistence_rmse": 0.015685971427701752
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.8194444444444444,
+          "contact_f1": 0.821917808219178,
+          "persistence_contact_accuracy": 0.9444444444444444,
+          "persistence_contact_f1": 0.9452054794520548,
+          "zero_linear_velocity_rmse": 0.10463781654834747,
+          "zero_angular_velocity_rmse": 0.9694430232048035
+        }
+      ]
+    },
+    {
+      "steps": 25,
+      "seconds": 2.5,
+      "total_rollouts": 234,
+      "fold_mean": {
+        "contact_accuracy": 0.8909482758620689,
+        "contact_f1": 0.8950965612777054,
+        "persistence_contact_accuracy": 0.7883620689655173,
+        "persistence_contact_f1": 0.7978605253354976,
+        "zero_linear_velocity_rmse": 0.014420607592910528,
+        "zero_angular_velocity_rmse": 0.2699156841263175,
+        "groups": {
+          "ee_position": {
+            "world_model_rmse": 0.019290702905842793,
+            "persistence_rmse": 0.07641522831284442
+          },
+          "arm_position": {
+            "world_model_rmse": 0.028405186918676537,
+            "persistence_rmse": 0.10539752216969162
+          },
+          "arm_velocity": {
+            "world_model_rmse": 0.02255893878706327,
+            "persistence_rmse": 0.046286487677911964
+          },
+          "package_position": {
+            "world_model_rmse": 0.03406405401157599,
+            "persistence_rmse": 0.05216756492785489
+          },
+          "package_orientation": {
+            "world_model_rmse": 0.1567065141134179,
+            "persistence_rmse": 0.18404526538435148
+          },
+          "package_linear_velocity": {
+            "world_model_rmse": 0.02165438029761152,
+            "persistence_rmse": 0.019671227367636355
+          },
+          "package_angular_velocity": {
+            "world_model_rmse": 0.35012681896329917,
+            "persistence_rmse": 0.35012681896329917
+          },
+          "gripper_aperture": {
+            "world_model_rmse": 0.015575255678842884,
+            "persistence_rmse": 0.03815504514397321
+          },
+          "gripper_velocity": {
+            "world_model_rmse": 0.04082852081807033,
+            "persistence_rmse": 0.047224925340666996
+          },
+          "tray_center": {
+            "world_model_rmse": 0.0,
+            "persistence_rmse": 0.0
+          }
+        }
+      },
+      "folds": [
+        {
+          "fold": 1,
+          "rollouts": 58,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.014241708943549087,
+              "persistence_rmse": 0.07623899021624125
+            },
+            "arm_position": {
+              "world_model_rmse": 0.021939714552194706,
+              "persistence_rmse": 0.0963530556655694
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.020904297721395584,
+              "persistence_rmse": 0.045050770067927626
+            },
+            "package_position": {
+              "world_model_rmse": 0.030495247109187957,
+              "persistence_rmse": 0.0575581233257829
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.10958841779959685,
+              "persistence_rmse": 0.19090891512976452
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.029350177597487564,
+              "persistence_rmse": 0.029350177597487564
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 1.0044074475298057,
+              "persistence_rmse": 1.0044074475298057
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.015535397192893095,
+              "persistence_rmse": 0.03818777475921769
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.04458081256104456,
+              "persistence_rmse": 0.062142583031362233
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.9310344827586207,
+          "contact_f1": 0.9375,
+          "persistence_contact_accuracy": 0.7586206896551724,
+          "persistence_contact_f1": 0.7878787878787878,
+          "zero_linear_velocity_rmse": 0.02071412466466427,
+          "zero_angular_velocity_rmse": 0.7157723903656006
+        },
+        {
+          "fold": 2,
+          "rollouts": 60,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.0211229388121216,
+              "persistence_rmse": 0.07699470944311927
+            },
+            "arm_position": {
+              "world_model_rmse": 0.031020560181892948,
+              "persistence_rmse": 0.11128853473779655
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.025577097294419218,
+              "persistence_rmse": 0.05364729405908376
+            },
+            "package_position": {
+              "world_model_rmse": 0.039582272023342704,
+              "persistence_rmse": 0.057620651314345836
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.1924953327385526,
+              "persistence_rmse": 0.19762347815853692
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.018729123506842298,
+              "persistence_rmse": 0.018729123506842298
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 0.10938006755932364,
+              "persistence_rmse": 0.10938006755932364
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.019976951304915117,
+              "persistence_rmse": 0.03453374948878114
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.01819630293390467,
+              "persistence_rmse": 0.00283775774121128
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.9,
+          "contact_f1": 0.90625,
+          "persistence_contact_accuracy": 0.8,
+          "persistence_contact_f1": 0.8064516129032258,
+          "zero_linear_velocity_rmse": 0.013866638764739037,
+          "zero_angular_velocity_rmse": 0.0864352360367775
+        },
+        {
+          "fold": 3,
+          "rollouts": 58,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.014858687441299048,
+              "persistence_rmse": 0.07767074596281584
+            },
+            "arm_position": {
+              "world_model_rmse": 0.020961241924785094,
+              "persistence_rmse": 0.10538315255675795
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.02061058903879935,
+              "persistence_rmse": 0.04548603991428873
+            },
+            "package_position": {
+              "world_model_rmse": 0.03789450302553325,
+              "persistence_rmse": 0.057545253195923664
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.19452212089327986,
+              "persistence_rmse": 0.20759368263000705
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.021371537819910205,
+              "persistence_rmse": 0.021371537819910205
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 0.22693924248830696,
+              "persistence_rmse": 0.22693924248830696
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.009064666028527424,
+              "persistence_rmse": 0.03639468152869384
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.07279586795912496,
+              "persistence_rmse": 0.09901921847432933
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.9224137931034483,
+          "contact_f1": 0.9230769230769231,
+          "persistence_contact_accuracy": 0.7327586206896551,
+          "persistence_contact_f1": 0.7350427350427351,
+          "zero_linear_velocity_rmse": 0.015096846036612988,
+          "zero_angular_velocity_rmse": 0.22458010911941528
+        },
+        {
+          "fold": 4,
+          "rollouts": 58,
+          "groups": {
+            "ee_position": {
+              "world_model_rmse": 0.02693947642640144,
+              "persistence_rmse": 0.07475646762920135
+            },
+            "arm_position": {
+              "world_model_rmse": 0.039699231015833385,
+              "persistence_rmse": 0.10856534571864254
+            },
+            "arm_velocity": {
+              "world_model_rmse": 0.023143771093638927,
+              "persistence_rmse": 0.04096184667034776
+            },
+            "package_position": {
+              "world_model_rmse": 0.028284193888240033,
+              "persistence_rmse": 0.03594623187536717
+            },
+            "package_orientation": {
+              "world_model_rmse": 0.13022018502224234,
+              "persistence_rmse": 0.14005498561909746
+            },
+            "package_linear_velocity": {
+              "world_model_rmse": 0.01716668226620601,
+              "persistence_rmse": 0.009234070546305356
+            },
+            "package_angular_velocity": {
+              "world_model_rmse": 0.05978051827576034,
+              "persistence_rmse": 0.05978051827576034
+            },
+            "gripper_aperture": {
+              "world_model_rmse": 0.0177240081890359,
+              "persistence_rmse": 0.04350397479920017
+            },
+            "gripper_velocity": {
+              "world_model_rmse": 0.02774109981820709,
+              "persistence_rmse": 0.024900142115765137
+            },
+            "tray_center": {
+              "world_model_rmse": 0.0,
+              "persistence_rmse": 0.0
+            }
+          },
+          "contact_accuracy": 0.8103448275862069,
+          "contact_f1": 0.8135593220338984,
+          "persistence_contact_accuracy": 0.8620689655172413,
+          "persistence_contact_f1": 0.8620689655172413,
+          "zero_linear_velocity_rmse": 0.00800482090562582,
+          "zero_angular_velocity_rmse": 0.05287500098347664
+        }
+      ]
+    }
+  ]
+}

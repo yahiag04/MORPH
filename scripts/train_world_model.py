@@ -17,15 +17,21 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from world_model.state_dynamics import fit_state_dynamics, save_checkpoint
+from world_model.transition_timing import transition_interval
 
 
-def _load(path: Path, method: str) -> dict[str, np.ndarray]:
+def _load(path: Path, method: str, legacy_interval: float | None = None) -> dict:
     with np.load(path, allow_pickle=False) as archive:
         required = ("states", "actions", "next_states", "clip_ids")
         missing = set(required) - set(archive.files)
         if missing:
             raise ValueError(f"{path} is missing arrays: {sorted(missing)}")
+        if (("splits" in archive and np.any(archive["splits"] != "unassigned")) or
+                ("source_kinds" in archive and np.any(archive["source_kinds"] != "human_replay"))):
+            raise ValueError("use the predefined scenario partitions for synthetic data; video splitting is not applicable")
         data = {key: archive[key] for key in required}
+        data["dt_seconds"] = transition_interval(archive.get("transition_dt_seconds"),
+                                                count=len(data["states"]), legacy_interval=legacy_interval)
     clips = data["clip_ids"].astype(str)
     data["clip_ids"] = clips
     data["episode_ids"] = np.asarray([f"{method}:{clip}" for clip in clips])
@@ -34,18 +40,18 @@ def _load(path: Path, method: str) -> dict[str, np.ndarray]:
 
 def _plot(metrics: dict, destination: Path) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(8, 3.7), constrained_layout=True)
-    names = ["EE position", "Arm position", "Package position"]
+    names = ["EE position", "Package position"]
     learned = [metrics["groups"][key]["world_model_rmse"]
-               for key in ("ee_position", "arm_position", "package_position")]
+               for key in ("ee_position", "package_position")]
     persistence = [metrics["groups"][key]["persistence_rmse"]
-                   for key in ("ee_position", "arm_position", "package_position")]
+                   for key in ("ee_position", "package_position")]
     x = np.arange(len(names))
     width = 0.36
     axes[0].bar(x - width / 2, learned, width, label="World model", color="#3568a8")
     axes[0].bar(x + width / 2, persistence, width, label="Persistence", color="#b5bec8")
     axes[0].set_xticks(x, names)
     axes[0].set_ylabel("Position RMSE (m)")
-    axes[0].set_title("0.5 s free rollout")
+    axes[0].set_title(f"{metrics['rollout_seconds']:g} s free rollout")
     axes[0].legend(frameon=False)
     axes[1].bar(["Accuracy", "F1"],
                 [metrics["rollout_contact_accuracy"], metrics["rollout_contact_f1"]],
@@ -67,21 +73,25 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=400)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--transition-dt-seconds", type=float,
+                        help="explicit interval for legacy archives without timing metadata")
     args = parser.parse_args()
     output_dir = args.output_dir.expanduser().resolve()
     if output_dir == ROOT or ROOT in output_dir.parents:
         parser.error("--output-dir must be outside the repository")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    direct = _load(args.direct_transitions.expanduser(), "direct")
-    confidence = _load(args.confidence_transitions.expanduser(), "confidence-aware")
+    direct = _load(args.direct_transitions.expanduser(), "direct", args.transition_dt_seconds)
+    confidence = _load(args.confidence_transitions.expanduser(), "confidence-aware", args.transition_dt_seconds)
+    if not np.isclose(direct["dt_seconds"], confidence["dt_seconds"], rtol=1e-7, atol=1e-9):
+        parser.error("both transition archives must have the same observation interval")
     states = np.concatenate((direct["states"], confidence["states"]))
     actions = np.concatenate((direct["actions"], confidence["actions"]))
     next_states = np.concatenate((direct["next_states"], confidence["next_states"]))
     clips = np.concatenate((direct["clip_ids"], confidence["clip_ids"]))
     episodes = np.concatenate((direct["episode_ids"], confidence["episode_ids"]))
     fit = fit_state_dynamics(states, actions, next_states, clips, episode_ids=episodes,
-                             epochs=args.epochs, seed=args.seed)
+                             epochs=args.epochs, seed=args.seed, transition_dt_seconds=direct["dt_seconds"])
     save_checkpoint(fit, str(output_dir / "state_dynamics.pt"))
     (output_dir / "training_metrics.json").write_text(
         json.dumps(fit.metrics, indent=2, allow_nan=False) + "\n", encoding="utf-8"

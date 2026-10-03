@@ -44,6 +44,40 @@ class TaskLayoutTests(unittest.TestCase):
 
 
 class DemonstrationManipulationTests(unittest.TestCase):
+    def test_observation_records_settling_without_changing_control_dynamics(self):
+        pickup = np.asarray((0.562, 0.100))
+        dropoff = np.asarray((0.564, -0.197))
+        path = np.array([[0., *pickup, .62], [1., .56, 0., .62], [2., *dropoff, .62]])
+        def scene():
+            return ContactManipulationEnv(pickup_xyz=(*pickup, .412), dropoff_xyz=(*dropoff, .416))
+        baseline, observed = scene(), scene()
+        first = run_demonstration_manipulation(baseline, path, pickup, dropoff,
+                                               simulation_steps_per_sample=50)
+        samples = []
+        second = run_demonstration_manipulation(observed, path, pickup, dropoff,
+            simulation_steps_per_sample=50, observation_steps=10,
+            on_observation=lambda row: samples.append(row))
+        np.testing.assert_allclose(observed.data.qpos, baseline.data.qpos, atol=1e-12)
+        np.testing.assert_allclose(observed.data.qvel, baseline.data.qvel, atol=1e-12)
+        self.assertEqual(first['success'], second['success'])
+        self.assertEqual(first['steps'], second['steps'])
+        self.assertEqual(samples[-1]['phase'], 'settle')
+        self.assertAlmostEqual(samples[0]['simulation_start_time'], 0.)
+        self.assertAlmostEqual(samples[-1]['simulation_end_time'], observed.data.time)
+        for previous, following in zip(samples, samples[1:]):
+            self.assertAlmostEqual(previous['simulation_end_time'], following['simulation_start_time'])
+        for row in samples:
+            self.assertAlmostEqual(row['simulation_end_time'] - row['simulation_start_time'], .02)
+            self.assertEqual(row['actuator_controls'].shape, (8,))
+        held = [row['actuator_controls'] for row in samples if row['phase'] == 'settle']
+        np.testing.assert_allclose(held, np.broadcast_to(held[0], np.asarray(held).shape))
+
+    def test_rejects_observations_that_straddle_control_updates(self):
+        env = ContactManipulationEnv(pickup_xyz=(.56,.10,.412), dropoff_xyz=(.56,-.19,.416))
+        with self.assertRaisesRegex(ValueError, 'divide'):
+            run_demonstration_manipulation(env, np.array([[0.,.56,.10,.62]]), (.56,.10), (.56,-.19),
+                                           simulation_steps_per_sample=50, observation_steps=7)
+
     def test_path_triggers_grasp_then_release_without_object_teleportation(self):
         env = ContactManipulationEnv(
             pickup_xyz=(0.60, 0.00, 0.412),

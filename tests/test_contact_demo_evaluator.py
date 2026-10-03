@@ -1,18 +1,70 @@
 """Tests for repeatable contact-task evaluation and outcome aggregation."""
 
 import unittest
+import tempfile
+from copy import copy
+from pathlib import Path
 
 import mujoco
 import numpy as np
 
 from evaluation.contact_demo_evaluator import (
     STATE_DIM, aggregate_contact_runs, contact_task_state, evaluate_contact_trajectory,
+    write_transition_archive,
 )
 from perception.task_layout import TaskLayout
 from simulation.contact_manipulation_env import ContactManipulationEnv
 
 
 class ContactDemoEvaluatorTests(unittest.TestCase):
+    def test_observation_refreshes_derived_fields_without_changing_live_simulation(self):
+        env = ContactManipulationEnv(pickup_xyz=(.55, .1, .412), dropoff_xyz=(.55, -.15, .416))
+        env.data.ctrl[0] += .2
+        for _ in range(10):
+            env.step()
+        saved = {key: getattr(env.data, key).copy() for key in
+                 ('qpos', 'qvel', 'qacc', 'qacc_warmstart', 'ctrl', 'xpos')}
+        time = env.data.time
+        expected = copy(env)
+        expected.data = mujoco.MjData(env.model)
+        mujoco.mj_copyData(expected.data, env.model, env.data)
+        mujoco.mj_forward(env.model, expected.data)
+        self.assertGreater(np.max(np.abs(env.get_end_effector_position() -
+                                        expected.get_end_effector_position())), 1e-7)
+        state = contact_task_state(env)
+        np.testing.assert_allclose(state[:3], expected.get_end_effector_position(), rtol=0, atol=3e-8)
+        np.testing.assert_allclose(state[17:20], expected.get_package_position(), rtol=0, atol=3e-8)
+        np.testing.assert_array_equal(state[32:34],
+            [expected.package_has_gripper_contact(), expected.package_has_support_contact()])
+        self.assertEqual(env.data.time, time)
+        for key, value in saved.items():
+            np.testing.assert_array_equal(getattr(env.data, key), value)
+
+    def test_archive_keeps_timing_actuator_controls_and_complete_settling(self):
+        pickup, dropoff = (.562, .1), (.564, -.197)
+        path = np.array([[0., *pickup, .62], [1., .56, 0., .62], [2., *dropoff, .62]])
+        run = evaluate_contact_trajectory(path, pickup, dropoff, human_label='synthetic',
+            simulation_steps_per_sample=50, observation_steps=10)
+        run.update(clip_id='episode-1', group_id='scenario-1', split='train', source_kind='simulation_randomized')
+        rows = run['transitions']
+        self.assertEqual(rows[-1]['phase'], 'settle')
+        self.assertGreater(len(rows), run['control_steps'])
+        self.assertAlmostEqual(sum(row['dt_seconds'] for row in rows), rows[-1]['simulation_end_time'])
+        for left, right in zip(rows, rows[1:]):
+            np.testing.assert_array_equal(left['next_state'], right['state'])
+        with tempfile.TemporaryDirectory() as folder:
+            out = Path(folder) / 'data.npz'
+            write_transition_archive([run], out)
+            with np.load(out, allow_pickle=False) as data:
+                self.assertEqual(data['actuator_controls'].shape, (len(rows), 8))
+                np.testing.assert_allclose(data['transition_dt_seconds'], .02)
+                np.testing.assert_allclose(data['simulation_end_times']-data['simulation_start_times'], .02)
+                self.assertEqual(set(data['source_kinds']), {'simulation_randomized'})
+                self.assertEqual(set(data['group_ids']), {'scenario-1'})
+                self.assertEqual(set(data['splits']), {'train'})
+                self.assertEqual(set(data['episode_ids']), {'episode-1'})
+                self.assertEqual(data['states'].shape[1], 37)
+
     def test_complete_state_includes_robot_package_and_task_context(self):
         env = ContactManipulationEnv(
             pickup_xyz=(0.55, 0.0, 0.412), dropoff_xyz=(0.55, 0.14, 0.416)

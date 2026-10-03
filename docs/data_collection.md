@@ -55,4 +55,21 @@ If automatic package/bowl detection is unavailable, pass `--task-layout /path/to
 
 The tracker reports a hand-classification score as a confidence proxy, not a calibrated probability of localization accuracy. It follows the nearest palm and marks jumps greater than 0.25 normalized image-coordinate units as missing. This reduces large identity jumps but does not guarantee hand identity when palms are close or cross.
 
-The contact replay succeeded on 5/16 direct-retargeted episodes and 4/16 confidence-aware episodes. These are simulated outcomes, and confidence-aware filtering did not materially change success on this batch. The learned state model improves one-step RMSE slightly over persistence on held-out clips but performs worse over a 0.5-second rollout. Neither result measures physical robot accuracy; validate camera geometry, control, and contact on hardware before making real-world claims.
+The contact replay succeeded on 5/16 direct-retargeted episodes and 4/16 confidence-aware episodes. These are simulated outcomes, and confidence-aware filtering did not materially change success on this batch. V2 improves several position groups at 25 steps, corresponding to 2.5 seconds in the original archives; its earlier 0.5-second label was incorrect. Package velocity remains a weakness. Neither result measures physical robot accuracy.
+
+## Complete simulation observations and randomized collection
+
+Contact replay now logs observations every 10 physics steps (20 ms in the default scene), independently of control updates every 50 physics steps (100 ms). Settling after release is also recorded. Changing the observation frequency does not change the held actuator commands or the simulation outcome. The observer interval must divide the controller interval.
+
+Schema 3 NPZ files retain `states`, `actions` and `next_states`, and add `actuator_controls` (eight values), `simulation_start_times`, `simulation_end_times`, `transition_dt_seconds`, `episode_ids`, `group_ids`, `source_kinds` and `splits`. `phases` includes `settle`. Simulation clocks determine durations; video timestamps are not a substitute for these clocks.
+
+```bash
+PYTHONPATH=src python scripts/collect_contact_dataset.py \
+  --output-dir /path/to/local_contact_dataset --families 60 --seed 20261003
+```
+
+This creates 240 synthetic episodes from 60 independently seeded layout/yaw families. Each family has nominal, faster-motion, pickup-offset and release-shift variants. Variant names describe the intervention; success is measured by physical lift and final placement, and failures are retained. Mass, friction and geometry are fixed in this collection.
+
+The family partition is fixed before simulation: 168 training, 36 validation and 36 test episodes. Keep all variants of a family together; never concatenate the reserved test partition into training or reassign rows by a random transition split. The existing video-training commands reject predefined synthetic partitions. The test data are reserved for the next model evaluation, and are only checked for archive integrity during collection.
+
+`manifest.json` contains per-episode parameters, relative archive paths, outcomes, software versions and source hashes. It also records a compiled MuJoCo `.mjb` snapshot and its SHA-256 digest; the scene XML digest alone would miss changes in included XML files. `summary.json` reports aggregate coverage and collection errors. Both are saved with the archives outside the repository; only the aggregate summary is published. Existing nonempty destinations are rejected to preserve previous collections. These episodes add no human demonstrations to the 16-video count.

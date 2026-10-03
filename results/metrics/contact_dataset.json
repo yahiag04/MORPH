@@ -1,0 +1,70 @@
+{
+  "source_kind": "simulation_randomized",
+  "human_demonstrations_added": 0,
+  "scenario_families": 60,
+  "planned_episodes": 240,
+  "collected_episodes": 240,
+  "collection_errors": 0,
+  "episodes_by_split": {
+    "train": 168,
+    "validation": 36,
+    "test": 36
+  },
+  "transitions": 207670,
+  "observation_dt_seconds": 0.02,
+  "control_dt_seconds": 0.1,
+  "simulated_seconds": 4153.400000000045,
+  "robot_successes": 71,
+  "failure_reasons": {
+    "package_not_stably_placed_in_tray": 108,
+    "package_not_lifted": 61
+  },
+  "episodes_by_variant": {
+    "nominal": {
+      "episodes": 60,
+      "robot_successes": 41
+    },
+    "fast": {
+      "episodes": 60,
+      "robot_successes": 12
+    },
+    "grasp_offset": {
+      "episodes": 60,
+      "robot_successes": 0
+    },
+    "release_shift": {
+      "episodes": 60,
+      "robot_successes": 18
+    }
+  },
+  "phase_counts": {
+    "approach": 63480,
+    "grasp": 16030,
+    "carry": 92515,
+    "release": 23645,
+    "settle": 12000
+  },
+  "contact_changes": 1009,
+  "package_moving_transitions": 62686,
+  "interpretation": "Coverage of a synthetic collection policy, not learned-controller performance. Object mass, friction and geometry are fixed; positions, yaw and commands vary. The test partition has not been used for model selection.",
+  "families_by_split": {
+    "train": 42,
+    "validation": 9,
+    "test": 9
+  },
+  "transitions_by_split": {
+    "train": 146785,
+    "validation": 30000,
+    "test": 30885
+  },
+  "integrity_audit": {
+    "archives_checked": 240,
+    "all_values_finite": true,
+    "state_chains_continuous": true,
+    "simulation_clocks_continuous": true,
+    "unit_package_quaternions": true,
+    "binary_contacts": true,
+    "overlapping_scenario_families": 0
+  },
+  "seed": 20261003
+}

@@ -65,6 +65,8 @@ The simulation success criteria require physical package lift and stable placeme
 
 The V2 predictor uses a 37-value robot, package, contact, and tray state; a five-member ensemble predicts continuous state changes and classifies the two contact flags separately. Training uses contiguous sequences with losses at 1, 5, and 25 control steps. Residual gains are calibrated on inner validation clips to reduce autoregressive drift. Evaluation uses four outer folds grouped by source video, so direct and confidence-aware replays of one video always remain together.
 
+**Timing correction:** the published V2 archives were sampled every 0.1 seconds. The 25-step results below therefore cover **2.5 seconds**. Earlier reports incorrectly labeled this horizon as 0.5 seconds. New archives record the measured simulation interval explicitly.
+
 | Held-out group (25-step RMSE) | World model | Persistence |
 | --- | ---: | ---: |
 | End-effector position (m) | 0.0193 | 0.0764 |
@@ -79,7 +81,13 @@ The V2 predictor uses a 37-value robot, package, contact, and tray state; a five
 
 Contact classification at the rollout endpoint reaches 89.1% accuracy and 89.5% F1 across 234 rollouts. The model improves most evaluated groups over persistence; package linear velocity remains slightly worse, and angular velocity falls back to persistence after validation calibration. These results come from simulated transitions driven by 16 videos and do not establish real-robot performance. The four-fold results and fold spread are in [`results/metrics/world_model_v2.json`](results/metrics/world_model_v2.json), with a grouped comparison in [`results/figures/world_model_v2.png`](results/figures/world_model_v2.png).
 
-V1 used a 19-value state and reported a pooled normalized RMSE of 0.3272 versus 0.1744 for persistence at 0.5 seconds. V2 changes the state schema and reports physical state groups separately, so the V1 aggregate is retained only as a historical baseline and is not numerically compared with V2. See [`results/metrics/world_model.json`](results/metrics/world_model.json) for the original V1 report.
+V1 used a 19-value state and reported a pooled normalized RMSE of 0.3272 versus 0.1744 for persistence at 25 steps. Its original seconds label was based on an assumed interval and should not be used. V2 changes the state schema and reports physical state groups separately, so the V1 aggregate is retained only as a historical baseline and is not numerically compared with V2. See [`results/metrics/world_model.json`](results/metrics/world_model.json) for the original V1 report.
+
+## Expanded simulation dataset
+
+A separate collection contains **240 synthetic episodes and 207,670 transitions at 50 Hz**, from 60 randomized scenario families. Layout, package yaw, speed, pickup estimation error and release behavior vary. The dataset includes 71 successful transfers, 169 observed failures, 12,000 settling transitions and 1,009 contact changes. These are outcomes of the collection controller, not results from a newly trained world model. The human dataset remains 16 videos.
+
+Whole scenario families are assigned to training (168 episodes), validation (36) or test (36) before simulation. Each transition includes measured simulation times and the eight actuator commands; the controller still updates every 100 ms while observations are logged every 20 ms. Archives and the reproduction manifest stay local. Aggregate coverage is in [`results/metrics/contact_dataset.json`](results/metrics/contact_dataset.json).
 
 ## What is implemented
 
@@ -161,6 +169,18 @@ PYTHONPATH=src python scripts/train_world_model.py \
 
 The command saves the checkpoint and clip-level details locally. The checked-in metrics and figure contain aggregate values only. `--help` lists available training options.
 
+For legacy archives without timing metadata, supply their verified interval explicitly, for example `--transition-dt-seconds 0.1` for the original V2 archives. The loader rejects missing or inconsistent timing. Synthetic archives have predefined partitions and are deliberately rejected by these video-splitting commands; the next model training stage must consume their supplied train/validation/test assignments.
+
+### Collect additional simulated episodes
+
+```bash
+PYTHONPATH=src python scripts/collect_contact_dataset.py \
+  --output-dir /path/to/local_contact_dataset \
+  --families 60 --seed 20261003
+```
+
+The destination must be empty and outside a Git repository. Four interventions are generated per family. The manifest records every planned episode, observed outcome, simulator version, collection-source hashes, and a compiled MuJoCo model snapshot so included XML changes are captured. Physical mass, friction and geometry remain fixed in this initial collection; varying them will require additional model context or identification.
+
 Read the full [recording, calibration, and processing protocol](docs/data_collection.md) before interpreting a replay. Marker calibration maps the recorded workspace corners to assumed robot XY bounds; it does not measure camera-to-robot geometry. Monocular video does not provide metric hand height, so the current mapping uses a fixed Z plane.
 
 ## Repository map
@@ -190,7 +210,7 @@ tests/              unit tests and generated-video fixtures
 - The oracle baseline is scripted and uses a simple cube. Its success does not establish performance on human demonstrations.
 - Temporal nearest-palm tracking can still confuse hands that cross or move close together.
 
-The current world model does not beat persistence over a 0.5-second rollout. Improve long-horizon dynamics prediction and validate camera-to-robot geometry before transferring this pipeline to a physical robot.
+V2 improves several position metrics at the audited 2.5-second horizon, but package velocity prediction remains weak. At 0.5 seconds, contact persistence also beats the learned classifier. The expanded dataset has not yet been used to retrain or evaluate a new model. Future evaluation should include velocity-zero and constant-velocity baselines, event-specific errors and the reserved scenario test partition.
 
 ## Verification
 

@@ -424,10 +424,13 @@ def fit_state_dynamics(
     validation_fraction: float = 0.25, seed: int = 17, epochs: int = 160,
     batch_size: int = 16, learning_rate: float = 5e-4,
     rollout_horizon: int = 25, patience: int = 20, ensemble_size: int = 5,
+    transition_dt_seconds: float | None = None,
 ) -> StateDynamicsFit:
     """Fit clip-bootstrapped dynamics using one-step and autoregressive losses."""
     if torch is None:
         raise ImportError("world-model training requires the optional PyTorch runtime")
+    if transition_dt_seconds is not None and (not np.isfinite(transition_dt_seconds) or transition_dt_seconds <= 0):
+        raise ValueError("transition_dt_seconds must be finite and positive")
     states, actions, next_states = validate_transitions(states, actions, next_states)
     clip_ids = np.asarray(clip_ids).astype(str)
     if clip_ids.shape != (len(states),):
@@ -531,7 +534,9 @@ def fit_state_dynamics(
         "epochs_per_member": epochs_run, "best_validation_loss_per_member": best_validation_losses,
         "one_step_normalized_rmse": _rmse(normalized_error),
         "persistence_one_step_normalized_rmse": _rmse(persistence_normalized_error),
-        "rollout_horizon_steps": int(rollout_horizon), "rollout_seconds": float(rollout_horizon * 0.02),
+        "rollout_horizon_steps": int(rollout_horizon),
+        "transition_dt_seconds": transition_dt_seconds,
+        "rollout_seconds": None if transition_dt_seconds is None else float(rollout_horizon * transition_dt_seconds),
         "rollout_position_group_rmse": _rmse(np.asarray([groups[name]["world_model_rmse"] for name in ("ee_position", "arm_position", "package_position")])),
         "persistence_rollout_position_group_rmse": _rmse(np.asarray([groups[name]["persistence_rmse"] for name in ("ee_position", "arm_position", "package_position")])),
         "rollout_count": rollout_contacts["rollouts"],
@@ -550,6 +555,7 @@ def evaluate_state_dynamics(
     fit: StateDynamicsFit, states: np.ndarray, actions: np.ndarray,
     next_states: np.ndarray, clip_ids: np.ndarray, *,
     episode_ids: np.ndarray | None = None, rollout_horizon: int = 25,
+    transition_dt_seconds: float | None = None,
 ) -> dict:
     """Evaluate a fitted model on a fully separate set of clip groups."""
     states, actions, next_states = validate_transitions(states, actions, next_states)
@@ -576,6 +582,8 @@ def evaluate_state_dynamics(
     return {
         "transition_count": len(states), "clip_count": len(np.unique(clips)),
         "rollout_horizon_steps": rollout_horizon, "groups": groups,
+        "transition_dt_seconds": transition_dt_seconds,
+        "rollout_seconds": None if transition_dt_seconds is None else rollout_horizon * transition_dt_seconds,
         "ensemble_disagreement_normalized": disagreement,
         "ensemble_disagreement_one_step_normalized": float(np.mean(spread)),
     }
