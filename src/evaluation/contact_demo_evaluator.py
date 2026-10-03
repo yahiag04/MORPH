@@ -14,24 +14,34 @@ from simulation.demonstration_manipulation import run_demonstration_manipulation
 from simulation.ik import ARM_JOINT_NAMES
 from simulation.panda_env import DEFAULT_MODEL_PATH
 
-STATE_DIM = 19
+STATE_DIM = 37
 ACTION_DIM = 4
 
 
-def _state_vector(env: ContactManipulationEnv) -> np.ndarray:
+def contact_task_state(env: ContactManipulationEnv) -> np.ndarray:
+    """Return the ordered 37-value Markov state used by dynamics training."""
     arm_qpos = []
+    arm_qvel = []
     for name in ARM_JOINT_NAMES:
         joint_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_JOINT, name)
         arm_qpos.append(env.data.qpos[env.model.jnt_qposadr[joint_id]])
+        arm_qvel.append(env.data.qvel[env.model.jnt_dofadr[joint_id]])
     finger_qpos = []
+    finger_qvel = []
     for name in ("finger_joint1", "finger_joint2"):
         joint_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_JOINT, name)
         finger_qpos.append(env.data.qpos[env.model.jnt_qposadr[joint_id]])
+        finger_qvel.append(env.data.qvel[env.model.jnt_dofadr[joint_id]])
     gripper_aperture = float(sum(finger_qpos))
+    package_qpos = int(env.model.jnt_qposadr[env.package_joint_id])
+    package_dof = int(env.model.jnt_dofadr[env.package_joint_id])
     return np.concatenate((
-        env.get_end_effector_position(), np.asarray(arm_qpos), env.get_package_position(),
-        env.get_package_linear_velocity(), np.asarray((gripper_aperture,
+        env.get_end_effector_position(), np.asarray(arm_qpos), np.asarray(arm_qvel),
+        env.get_package_position(), env.data.qpos[package_qpos + 3:package_qpos + 7],
+        env.data.qvel[package_dof:package_dof + 3], env.data.qvel[package_dof + 3:package_dof + 6],
+        np.asarray((gripper_aperture, sum(finger_qvel),
             float(env.package_has_gripper_contact()), float(env.package_has_support_contact()))),
+        env.dropoff_xyz,
     )).astype(np.float32)
 
 
@@ -56,12 +66,12 @@ def evaluate_contact_trajectory(
         pickup_xyz=(float(pickup[0]), float(pickup[1]), 0.412),
         dropoff_xyz=(float(dropoff[0]), float(dropoff[1]), 0.416),
     )
-    initial_state = _state_vector(env)
+    initial_state = contact_task_state(env)
     after: list[np.ndarray] = []
     actions: list[np.ndarray] = []
 
     def record(row: dict) -> None:
-        state = _state_vector(env)
+        state = contact_task_state(env)
         target = np.asarray(row["target_xyz"], dtype=np.float32)
         command = 0.0 if row["gripper_command"] == "close" else 0.08
         actions.append(np.concatenate((target, np.asarray((command,), dtype=np.float32))))
