@@ -1,0 +1,129 @@
+{
+  "source_kind": "simulation_randomized",
+  "dataset": {
+    "episodes_by_split": {
+      "train": 168,
+      "validation": 36,
+      "test": 36
+    },
+    "scenario_families_by_split": {
+      "train": 42,
+      "validation": 9,
+      "test": 9
+    },
+    "transitions_by_split": {
+      "train": 146785,
+      "validation": 30000,
+      "test": 30885
+    },
+    "observation_dt_seconds": 0.02
+  },
+  "training": {
+    "batch_size": 128,
+    "ensemble_size": 3,
+    "seed": 2026,
+    "train_families_used": 31,
+    "inner_early_stopping_families": 11,
+    "validation_role": "residual-gain calibration and diagnostic metrics",
+    "test_role": "single held-out final evaluation",
+    "max_epochs": 40
+  },
+  "evaluation": {
+    "partition": "test",
+    "scenario_families": 9,
+    "episodes": 36,
+    "transitions": 30885,
+    "rollout_horizon_steps": 25,
+    "rollout_seconds": 0.5,
+    "rollouts": 1220,
+    "groups": {
+      "ee_position": {
+        "one_step_rmse": 0.00047883023580506305,
+        "persistence_one_step_rmse": 0.0009188411078571004,
+        "normalized_one_step_rmse": 0.006618755848727229,
+        "world_model_rmse": 0.005626591211460949,
+        "persistence_rmse": 0.021210055588338918
+      },
+      "arm_position": {
+        "one_step_rmse": 0.0005015655967229765,
+        "persistence_one_step_rmse": 0.0009487878965438281,
+        "normalized_one_step_rmse": 0.009236679045938948,
+        "world_model_rmse": 0.007133146298110772,
+        "persistence_rmse": 0.021775643587505826
+      },
+      "arm_velocity": {
+        "one_step_rmse": 0.01881483854418743,
+        "persistence_one_step_rmse": 0.01900512968120657,
+        "normalized_one_step_rmse": 0.37055289216174137,
+        "world_model_rmse": 0.017985695014589523,
+        "persistence_rmse": 0.023880875008465637
+      },
+      "package_position": {
+        "one_step_rmse": 0.000547205407399855,
+        "persistence_one_step_rmse": 0.00103244914920226,
+        "normalized_one_step_rmse": 0.008293430261160929,
+        "world_model_rmse": 0.011035916407801102,
+        "persistence_rmse": 0.0157505944915598
+      },
+      "package_orientation": {
+        "one_step_rmse": 0.003918089720188317,
+        "persistence_one_step_rmse": 0.0059948077660990085,
+        "normalized_one_step_rmse": 0.013532891069891117,
+        "world_model_rmse": 0.07040186643922965,
+        "persistence_rmse": 0.07632462162334601
+      },
+      "package_linear_velocity": {
+        "one_step_rmse": 0.023120658660904056,
+        "persistence_one_step_rmse": 0.02454290533093093,
+        "normalized_one_step_rmse": 0.48573631652735416,
+        "world_model_rmse": 0.0629911642209483,
+        "persistence_rmse": 0.08950594905859657
+      },
+      "package_angular_velocity": {
+        "one_step_rmse": 0.3686965683649621,
+        "persistence_one_step_rmse": 0.38557285577239064,
+        "normalized_one_step_rmse": 0.52545850957001,
+        "world_model_rmse": 0.8912161880091289,
+        "persistence_rmse": 1.2480327870249066
+      },
+      "gripper_aperture": {
+        "one_step_rmse": 0.0004365339647949954,
+        "persistence_one_step_rmse": 0.0012351260586322133,
+        "normalized_one_step_rmse": 0.013672883742009357,
+        "world_model_rmse": 0.0073322604283644535,
+        "persistence_rmse": 0.019853963869489948
+      },
+      "gripper_velocity": {
+        "one_step_rmse": 0.025354792954697926,
+        "persistence_one_step_rmse": 0.027230793098275488,
+        "normalized_one_step_rmse": 0.40940065679736376,
+        "world_model_rmse": 0.032302283621752956,
+        "persistence_rmse": 0.04142969151263566
+      },
+      "tray_center": {
+        "one_step_rmse": 0.0,
+        "persistence_one_step_rmse": 0.0,
+        "normalized_one_step_rmse": 0.0,
+        "world_model_rmse": 0.0,
+        "persistence_rmse": 0.0
+      }
+    },
+    "contact_classifier": {
+      "accuracy": 0.9680327868852459,
+      "f1": 0.9689984101748808,
+      "persistence_accuracy": 0.95,
+      "persistence_f1": 0.9509646302250804
+    },
+    "velocity_baselines": {
+      "package_linear_velocity": {
+        "zero_velocity_rmse": 0.0641183485029172,
+        "persistence_rmse": 0.08950594879694869
+      },
+      "package_angular_velocity": {
+        "zero_velocity_rmse": 0.8855065714905449,
+        "persistence_rmse": 1.2480327847108177
+      }
+    }
+  },
+  "limitations": "Results apply to held-out randomized MuJoCo scenario families and do not establish physical-robot performance. They are not directly comparable with the separate human-video evaluation distribution."
+}

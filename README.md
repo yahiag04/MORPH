@@ -85,9 +85,15 @@ V1 used a 19-value state and reported a pooled normalized RMSE of 0.3272 versus 
 
 ## Expanded simulation dataset
 
-A separate collection contains **240 synthetic episodes and 207,670 transitions at 50 Hz**, from 60 randomized scenario families. Layout, package yaw, speed, pickup estimation error and release behavior vary. The dataset includes 71 successful transfers, 169 observed failures, 12,000 settling transitions and 997 contact changes. Observations refresh derived positions and contacts from the current joint state on a simulator snapshot. These are outcomes of the collection controller, not results from a newly trained world model. The human dataset remains 16 videos.
+A separate collection contains **240 synthetic episodes and 207,670 transitions at 50 Hz**, from 60 randomized scenario families. Layout, package yaw, speed, pickup estimation error and release behavior vary. The dataset includes 71 successful transfers, 169 observed failures, 12,000 settling transitions and 997 contact changes. Observations refresh derived positions and contacts from the current joint state on a simulator snapshot. These are outcomes of the collection controller. The human dataset remains 16 videos.
 
 Whole scenario families are assigned to training (168 episodes), validation (36) or test (36) before simulation. Each transition includes measured simulation times and the eight actuator commands; the controller still updates every 100 ms while observations are logged every 20 ms. Archives and the reproduction manifest stay local. Aggregate coverage is in [`results/metrics/contact_dataset.json`](results/metrics/contact_dataset.json).
+
+## World model trained on randomized scenarios
+
+A three-member ensemble was trained from the assigned training families, calibrated on the validation families, and evaluated once on the reserved test families. At a 25-step (0.5-second) rollout horizon, the model reduces held-out error versus persistence for end-effector position (0.0056 vs 0.0212 m), arm position (0.0071 vs 0.0218 rad), and package position (0.0110 vs 0.0158 m). Contact prediction reaches 96.8% accuracy and 96.9% F1; holding the initial contact flags gives 95.0% and 95.1% on the same windows.
+
+Package linear velocity improves over persistence (0.0630 vs 0.0895 m/s) and is close to predicting zero velocity (0.0641 m/s). Package angular velocity improves over persistence (0.8912 vs 1.2480 rad/s), while zero velocity is slightly better (0.8855 rad/s). These are held-out results within this simulator and scenario family distribution; they do not measure real robot performance and are not directly comparable to the earlier human-video evaluation. Detailed aggregate values are in [`results/metrics/synthetic_world_model.json`](results/metrics/synthetic_world_model.json), with a plot in [`results/figures/synthetic_world_model.png`](results/figures/synthetic_world_model.png).
 
 ## What is implemented
 
@@ -169,7 +175,19 @@ PYTHONPATH=src python scripts/train_world_model.py \
 
 The command saves the checkpoint and clip-level details locally. The checked-in metrics and figure contain aggregate values only. `--help` lists available training options.
 
-For legacy archives without timing metadata, supply their verified interval explicitly, for example `--transition-dt-seconds 0.1` for the original V2 archives. CV evaluation also checks the training interval stored in each checkpoint; for older checkpoints, pass a verified `--checkpoint-dt-seconds` value. The loader rejects missing or inconsistent timing. Synthetic archives have predefined partitions and are deliberately rejected by these video-splitting commands; the next model training stage must consume their supplied train/validation/test assignments.
+For legacy archives without timing metadata, supply their verified interval explicitly, for example `--transition-dt-seconds 0.1` for the original V2 archives. CV evaluation also checks the training interval stored in each checkpoint; for older checkpoints, pass a verified `--checkpoint-dt-seconds` value. The loader rejects missing or inconsistent timing. Synthetic archives have predefined partitions and are deliberately rejected by the video-splitting commands; use the dedicated command below so the scenario families stay in their supplied partitions.
+
+### Train on the randomized scenario dataset
+
+Run this in the optional PyTorch environment. Archives and checkpoints remain outside Git; the command keeps the test partition untouched until final evaluation.
+
+```bash
+PYTHONPATH=src python scripts/train_synthetic_world_model.py \\
+  --dataset-dir /path/to/local_contact_dataset \\
+  --output-dir /path/to/local_synthetic_world_model
+```
+
+The default trains a three-member ensemble with 40 maximum epochs. It uses whole scenario families for early stopping, calibrates rollout gains on the assigned validation families, and reports final metrics on the held-out test families.
 
 ### Collect additional simulated episodes
 
