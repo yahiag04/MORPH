@@ -94,6 +94,32 @@ def assign_outer_folds(
     return np.fromiter((clip_to_fold[clip] for clip in clips), dtype=np.int64, count=len(clips))
 
 
+def contiguous_episode_indices(episode_ids: np.ndarray, start_times: np.ndarray,
+                               end_times: np.ndarray, *, atol: float = 1e-8
+                               ) -> list[tuple[str, np.ndarray]]:
+    """Return complete contiguous sequences, rejecting gaps and interleaved rows."""
+    episodes = np.asarray(episode_ids).astype(str)
+    starts = np.asarray(start_times, dtype=np.float64)
+    ends = np.asarray(end_times, dtype=np.float64)
+    if episodes.ndim != 1 or starts.shape != episodes.shape or ends.shape != episodes.shape:
+        raise ValueError("episode_ids, start_times, and end_times must be matching vectors")
+    if not len(episodes) or not np.isfinite(starts).all() or not np.isfinite(ends).all():
+        raise ValueError("episode timing arrays must be non-empty and finite")
+    sequences = []
+    for episode in np.unique(episodes):
+        indices = np.flatnonzero(episodes == episode)
+        if np.any(np.diff(indices) != 1):
+            raise ValueError(f"episode {episode!r} is interleaved or split in the archive")
+        if np.any(ends[indices] <= starts[indices]):
+            raise ValueError(f"episode {episode!r} contains a non-positive transition interval")
+        if len(indices) > 1 and not np.allclose(
+            starts[indices[1:]], ends[indices[:-1]], rtol=0.0, atol=atol
+        ):
+            raise ValueError(f"episode {episode!r} contains a temporal gap or overlap")
+        sequences.append((str(episode), indices))
+    return sequences
+
+
 def rollout_episode(model, normalizer, initial_state: np.ndarray,
                     actions: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Autoregressively predict a complete episode and per-step ensemble disagreement.
@@ -129,18 +155,11 @@ def rollout_episode(model, normalizer, initial_state: np.ndarray,
         current = torch.as_tensor(initial.reshape(1, -1))
         for index, action in enumerate(action_array):
             action_tensor = torch.as_tensor(action.reshape(1, -1))
-            next_state, _, _ = _step_torch(
-                model, current, action_tensor, params, hard_contacts=True
+            next_state, _, _, continuous, contact_logits = _step_torch(
+                model, current, action_tensor, params, hard_contacts=True,
+                return_member_outputs=True,
             )
-            normalized_state = (current - params["state_mean"]) / params["state_scale"]
-            normalized_action = (action_tensor - params["action_mean"]) / params["action_scale"]
-            member_outputs = [
-                member(normalized_state, normalized_action) for member in model.members
-            ]
-            continuous = torch.stack([output[0] for output in member_outputs])
-            contact_probability = torch.stack([
-                torch.sigmoid(output[1]) for output in member_outputs
-            ])
+            contact_probability = torch.sigmoid(contact_logits)
             continuous_spread = continuous.std(dim=0, unbiased=False).mean()
             contact_spread = contact_probability.std(dim=0, unbiased=False).mean()
             disagreements[index] = float(((continuous_spread + contact_spread) / 2.0).item())
@@ -235,6 +254,8 @@ def compare_predicted_outcomes(predictions: list[dict], outcomes: dict) -> dict:
 
     pair_results = []
     selection_regrets = []
+    clip_candidates = []
+    method_summary = {}
     for rows in by_clip.values():
         success_scores = [score for _, score, success in rows if success]
         failure_scores = [score for _, score, success in rows if not success]
@@ -252,6 +273,38 @@ def compare_predicted_outcomes(predictions: list[dict], outcomes: dict) -> dict:
         ]))
         best_actual = float(any(success for _, _, success in rows))
         selection_regrets.append(best_actual - selected_success_rate)
+        clip_candidates.append((float(np.mean([score for _, score, _ in rows])),
+                                float(np.mean([success for _, _, success in rows]))))
+
+    for method in METHODS:
+        method_rows = [
+            (score, labels[(clip, candidate_method)])
+            for clip, rows in by_clip.items()
+            for candidate_method, score, _ in rows
+            if candidate_method == method
+        ]
+        method_summary[method] = {
+            "episode_count": len(method_rows),
+            "robot_success_count": int(sum(success for _, success in method_rows)),
+            "robot_success_rate": float(np.mean([success for _, success in method_rows])),
+            "mean_predicted_score": float(np.mean([score for score, _ in method_rows])),
+        }
+
+    cross_clip_pairs = []
+    for index, (score_a, outcome_a) in enumerate(clip_candidates):
+        for score_b, outcome_b in clip_candidates[index + 1:]:
+            if np.isclose(outcome_a, outcome_b, atol=1e-12):
+                continue
+            cross_clip_pairs.append(
+                0.5 if np.isclose(score_a, score_b, atol=1e-12)
+                else float((score_a > score_b) == (outcome_a > outcome_b))
+            )
+    best_clip_outcome = max(outcome for _, outcome in clip_candidates)
+    best_clip_score = max(score for score, _ in clip_candidates)
+    selected_clip_outcome = float(np.mean([
+        outcome for score, outcome in clip_candidates
+        if np.isclose(score, best_clip_score, atol=1e-12)
+    ]))
 
     gaps = [abs(prediction_by_key[key] - float(labels[key])) for key in prediction_by_key]
     ties = sum(
@@ -265,6 +318,11 @@ def compare_predicted_outcomes(predictions: list[dict], outcomes: dict) -> dict:
         "pairwise_tie_count": ties,
         "pairwise_ranking_accuracy": float(np.mean(pair_results)) if pair_results else None,
         "mean_selection_regret": float(np.mean(selection_regrets)),
+        "cross_clip_informative_pair_count": len(cross_clip_pairs),
+        "cross_clip_pairwise_tie_count": sum(value == 0.5 for value in cross_clip_pairs),
+        "cross_clip_pairwise_ranking_accuracy": float(np.mean(cross_clip_pairs)) if cross_clip_pairs else None,
+        "global_candidate_selection_regret": float(best_clip_outcome - selected_clip_outcome),
+        "method_summary": method_summary,
         "mean_absolute_score_outcome_gap": float(np.mean(gaps)),
         "score_interpretation": "fraction of six physical task criteria; not a calibrated probability",
     }

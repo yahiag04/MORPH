@@ -227,13 +227,15 @@ def _normalizer_tensors(normalizer: DynamicsNormalizer, device="cpu") -> dict[st
             for name in ("state_mean", "state_scale", "action_mean", "action_scale", "delta_mean", "delta_scale")}
 
 
-def _step_torch(model, state, action, normalizer, *, hard_contacts: bool = False):
+def _step_torch(model, state, action, normalizer, *, hard_contacts: bool = False,
+                return_member_outputs: bool = False):
     params = _normalizer_tensors(normalizer, state.device) if isinstance(normalizer, DynamicsNormalizer) else normalizer
     normalized_state = (state - params["state_mean"]) / params["state_scale"]
     normalized_action = (action - params["action_mean"]) / params["action_scale"]
     output = model(normalized_state, normalized_action)
     if len(output) == 4:
         continuous_delta, contact_logits = output[:2]
+        member_continuous, member_contact_logits = output[2:]
     else:
         continuous_delta, contact_logits = output
     indices = torch.as_tensor(DYNAMIC_STATE_INDICES, device=state.device)
@@ -250,7 +252,12 @@ def _step_torch(model, state, action, normalizer, *, hard_contacts: bool = False
         contact_values = contact_probabilities
     contacts = {index: offset for offset, index in enumerate(CONTACT_STATE_INDICES)}
     next_state = torch.cat((next_dynamic, contact_values, state[:, 34:37]), dim=-1)
-    return next_state, contact_logits, contact_probabilities
+    result = (next_state, contact_logits, contact_probabilities)
+    if return_member_outputs:
+        if len(output) != 4:
+            raise ValueError("member outputs are available only from an ensemble model")
+        return (*result, member_continuous, member_contact_logits)
+    return result
 
 
 def predict_next_state(

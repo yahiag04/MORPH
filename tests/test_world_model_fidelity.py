@@ -66,6 +66,20 @@ class EpisodeOutcomeLoadingTests(unittest.TestCase):
 
 
 class WorldModelArchiveTests(unittest.TestCase):
+    def test_contiguous_episode_windows_reject_temporal_gaps_and_interleaving(self):
+        from world_model.fidelity import contiguous_episode_indices
+
+        episodes = np.array(["a", "a", "b", "b"])
+        starts = np.array([0.0, 0.1, 0.0, 0.1])
+        ends = starts + 0.1
+        windows = contiguous_episode_indices(episodes, starts, ends)
+        self.assertEqual([(name, indices.tolist()) for name, indices in windows],
+                         [("a", [0, 1]), ("b", [2, 3])])
+        with self.assertRaisesRegex(ValueError, "gap or overlap"):
+            contiguous_episode_indices(episodes, starts + np.array([0, 0.01, 0, 0]), ends)
+        with self.assertRaisesRegex(ValueError, "interleaved or split"):
+            contiguous_episode_indices(np.array(["a", "b", "a", "b"]), starts, ends)
+
     def test_pair_loader_preserves_episode_labels_and_phases(self):
         from scripts.evaluate_world_model_cv import _load_pair
 
@@ -88,6 +102,7 @@ class WorldModelArchiveTests(unittest.TestCase):
             data = _load_pair(path, "direct")
 
         np.testing.assert_array_equal(data["episode_ids"], ["demo_a:direct"] * 2)
+        np.testing.assert_array_equal(data["method_ids"], ["direct"] * 2)
         np.testing.assert_array_equal(data["human_labels"], ["riusciti"] * 2)
         np.testing.assert_array_equal(data["phases"], ["approach", "settle"])
 
@@ -303,6 +318,31 @@ class ModelFidelityScoringTests(unittest.TestCase):
         self.assertEqual(report["pairwise_tie_count"], 1)
         self.assertEqual(report["pairwise_ranking_accuracy"], 0.75)
         self.assertAlmostEqual(report["mean_selection_regret"], 1 / 6)
+        self.assertEqual(report["cross_clip_informative_pair_count"], 2)
+        self.assertEqual(report["cross_clip_pairwise_ranking_accuracy"], 1.0)
+        self.assertEqual(report["global_candidate_selection_regret"], 0.0)
+
+    def test_cross_clip_selection_reports_ties_and_regret(self):
+        from world_model.fidelity import compare_predicted_outcomes
+
+        predictions = [
+            {"clip_id": clip, "method": method, "score": 0.5}
+            for clip in ("success", "failure")
+            for method in ("direct", "confidence-aware")
+        ]
+        outcomes = {
+            ("success", "direct"): {"robot_success": True},
+            ("success", "confidence-aware"): {"robot_success": True},
+            ("failure", "direct"): {"robot_success": False},
+            ("failure", "confidence-aware"): {"robot_success": False},
+        }
+
+        report = compare_predicted_outcomes(predictions, outcomes)
+
+        self.assertEqual(report["cross_clip_informative_pair_count"], 1)
+        self.assertEqual(report["cross_clip_pairwise_tie_count"], 1)
+        self.assertEqual(report["cross_clip_pairwise_ranking_accuracy"], 0.5)
+        self.assertEqual(report["global_candidate_selection_regret"], 0.5)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,427 @@
+{
+  "experiment": "human-demonstration-driven MuJoCo dynamics",
+  "state_dim": 37,
+  "action_dim": 4,
+  "transition_count": 25920,
+  "source_clip_count": 16,
+  "outer_fold_count": 4,
+  "transition_dt_seconds": 0.02,
+  "horizons": {
+    "one_step": {
+      "steps": 1,
+      "seconds": 0.02,
+      "episode_count": 32,
+      "groups": {
+        "ee_position": {
+          "world_model_rmse": 0.00017578290135134012,
+          "persistence_rmse": 0.000599851060542278
+        },
+        "arm_position": {
+          "world_model_rmse": 0.0002671488400665112,
+          "persistence_rmse": 0.0006744521087966859
+        },
+        "arm_velocity": {
+          "world_model_rmse": 0.03796720691025257,
+          "persistence_rmse": 0.03862237837165594
+        },
+        "package_position": {
+          "world_model_rmse": 0.00032349246976082213,
+          "persistence_rmse": 0.0003238599456381053
+        },
+        "package_orientation": {
+          "world_model_rmse": 0.0017051412432920188,
+          "persistence_rmse": 0.001235445961356166
+        },
+        "package_linear_velocity": {
+          "world_model_rmse": 0.020454565063118935,
+          "persistence_rmse": 0.022030076012015343
+        },
+        "package_angular_velocity": {
+          "world_model_rmse": 0.12210497981868694,
+          "persistence_rmse": 0.10957938432693505
+        },
+        "gripper_aperture": {
+          "world_model_rmse": 0.003030371095519513,
+          "persistence_rmse": 0.005373359424993396
+        },
+        "gripper_velocity": {
+          "world_model_rmse": 0.40809494256973267,
+          "persistence_rmse": 0.418017216026783
+        },
+        "tray_center": {
+          "world_model_rmse": 0.0,
+          "persistence_rmse": 0.0
+        }
+      },
+      "contact_accuracy": 1.0,
+      "contact_f1": 1.0,
+      "fold_std": {
+        "groups": {
+          "ee_position": {
+            "world_model_rmse": 5.847840131051545e-05,
+            "persistence_rmse": 9.15711131573441e-06
+          },
+          "arm_position": {
+            "world_model_rmse": 5.788491896120561e-05,
+            "persistence_rmse": 7.810981894311512e-05
+          },
+          "arm_velocity": {
+            "world_model_rmse": 0.0028108958666551156,
+            "persistence_rmse": 0.002977066840685363
+          },
+          "package_position": {
+            "world_model_rmse": 0.00023623728632284172,
+            "persistence_rmse": 0.0003072943153696876
+          },
+          "package_orientation": {
+            "world_model_rmse": 0.0019081967464695605,
+            "persistence_rmse": 0.0021398551750746483
+          },
+          "package_linear_velocity": {
+            "world_model_rmse": 0.022504946792472787,
+            "persistence_rmse": 0.021468318240002074
+          },
+          "package_angular_velocity": {
+            "world_model_rmse": 0.18316723956430933,
+            "persistence_rmse": 0.18979706111636768
+          },
+          "gripper_aperture": {
+            "world_model_rmse": 0.00046478093690285297,
+            "persistence_rmse": 2.3283064365386963e-10
+          },
+          "gripper_velocity": {
+            "world_model_rmse": 0.012323401502140707,
+            "persistence_rmse": 1.2904784139758924e-08
+          },
+          "tray_center": {
+            "world_model_rmse": 0.0,
+            "persistence_rmse": 0.0
+          }
+        },
+        "contact_accuracy": 0.0,
+        "contact_f1": 0.0
+      }
+    },
+    "0.5_seconds": {
+      "steps": 25,
+      "seconds": 0.5,
+      "episode_count": 32,
+      "groups": {
+        "ee_position": {
+          "world_model_rmse": 0.00652998685836792,
+          "persistence_rmse": 0.02098646480590105
+        },
+        "arm_position": {
+          "world_model_rmse": 0.009097914211452007,
+          "persistence_rmse": 0.02236145082861185
+        },
+        "arm_velocity": {
+          "world_model_rmse": 0.01947659603320062,
+          "persistence_rmse": 0.029750625602900982
+        },
+        "package_position": {
+          "world_model_rmse": 0.0039377452922053635,
+          "persistence_rmse": 0.0009676028057583608
+        },
+        "package_orientation": {
+          "world_model_rmse": 0.01220890530385077,
+          "persistence_rmse": 0.004790643734427102
+        },
+        "package_linear_velocity": {
+          "world_model_rmse": 0.009339962469389944,
+          "persistence_rmse": 0.0005532776785156564
+        },
+        "package_angular_velocity": {
+          "world_model_rmse": 0.04703124300257233,
+          "persistence_rmse": 0.0034271656465323375
+        },
+        "gripper_aperture": {
+          "world_model_rmse": 0.03105297265574336,
+          "persistence_rmse": 0.0794274341315031
+        },
+        "gripper_velocity": {
+          "world_model_rmse": 0.022394282277673483,
+          "persistence_rmse": 0.006042724242433906
+        },
+        "tray_center": {
+          "world_model_rmse": 0.0,
+          "persistence_rmse": 0.0
+        }
+      },
+      "contact_accuracy": 1.0,
+      "contact_f1": 1.0,
+      "fold_std": {
+        "groups": {
+          "ee_position": {
+            "world_model_rmse": 0.001724614999969687,
+            "persistence_rmse": 6.0622739907242405e-05
+          },
+          "arm_position": {
+            "world_model_rmse": 0.0027675855181994195,
+            "persistence_rmse": 0.002676519840327123
+          },
+          "arm_velocity": {
+            "world_model_rmse": 0.005154999567754948,
+            "persistence_rmse": 0.003443411859324764
+          },
+          "package_position": {
+            "world_model_rmse": 0.0019568038152893387,
+            "persistence_rmse": 0.0010721123397670642
+          },
+          "package_orientation": {
+            "world_model_rmse": 0.005703153641009526,
+            "persistence_rmse": 0.008297638259649577
+          },
+          "package_linear_velocity": {
+            "world_model_rmse": 0.013081474582264652,
+            "persistence_rmse": 0.0009583048967291422
+          },
+          "package_angular_velocity": {
+            "world_model_rmse": 0.04783889383953787,
+            "persistence_rmse": 0.005935918900145251
+          },
+          "gripper_aperture": {
+            "world_model_rmse": 0.010184177547673942,
+            "persistence_rmse": 9.281506764367963e-08
+          },
+          "gripper_velocity": {
+            "world_model_rmse": 0.016693910764006517,
+            "persistence_rmse": 3.375023738205069e-07
+          },
+          "tray_center": {
+            "world_model_rmse": 0.0,
+            "persistence_rmse": 0.0
+          }
+        },
+        "contact_accuracy": 0.0,
+        "contact_f1": 0.0
+      }
+    },
+    "2.5_seconds": {
+      "steps": 125,
+      "seconds": 2.5,
+      "episode_count": 32,
+      "groups": {
+        "ee_position": {
+          "world_model_rmse": 0.03018575580790639,
+          "persistence_rmse": 0.11270305141806602
+        },
+        "arm_position": {
+          "world_model_rmse": 0.0462511507794261,
+          "persistence_rmse": 0.11288559809327126
+        },
+        "arm_velocity": {
+          "world_model_rmse": 0.024685104377567768,
+          "persistence_rmse": 0.028952680062502623
+        },
+        "package_position": {
+          "world_model_rmse": 0.008341615903191268,
+          "persistence_rmse": 0.0015864093220443465
+        },
+        "package_orientation": {
+          "world_model_rmse": 0.021949585061520338,
+          "persistence_rmse": 0.00711980816764779
+        },
+        "package_linear_velocity": {
+          "world_model_rmse": 0.007356125361025256,
+          "persistence_rmse": 0.0006494415035053162
+        },
+        "package_angular_velocity": {
+          "world_model_rmse": 0.05383373600185504,
+          "persistence_rmse": 0.00522104244304078
+        },
+        "gripper_aperture": {
+          "world_model_rmse": 0.007632514578290284,
+          "persistence_rmse": 0.07999728247523308
+        },
+        "gripper_velocity": {
+          "world_model_rmse": 0.002925744635376759,
+          "persistence_rmse": 2.9633339181600604e-05
+        },
+        "tray_center": {
+          "world_model_rmse": 0.0,
+          "persistence_rmse": 0.0
+        }
+      },
+      "contact_accuracy": 1.0,
+      "contact_f1": 1.0,
+      "fold_std": {
+        "groups": {
+          "ee_position": {
+            "world_model_rmse": 0.008169216561880974,
+            "persistence_rmse": 0.00038275136139549217
+          },
+          "arm_position": {
+            "world_model_rmse": 0.00848929804133462,
+            "persistence_rmse": 0.007394336793027524
+          },
+          "arm_velocity": {
+            "world_model_rmse": 0.007907948950527524,
+            "persistence_rmse": 0.0015022861501740128
+          },
+          "package_position": {
+            "world_model_rmse": 0.002679712668653034,
+            "persistence_rmse": 0.002143916666029089
+          },
+          "package_orientation": {
+            "world_model_rmse": 0.007853861803398024,
+            "persistence_rmse": 0.012331787092786482
+          },
+          "package_linear_velocity": {
+            "world_model_rmse": 0.0062370479147362805,
+            "persistence_rmse": 0.0011248655363931958
+          },
+          "package_angular_velocity": {
+            "world_model_rmse": 0.04401966769519988,
+            "persistence_rmse": 0.009042988967339691
+          },
+          "gripper_aperture": {
+            "world_model_rmse": 0.0018701276048967597,
+            "persistence_rmse": 8.584753470740944e-07
+          },
+          "gripper_velocity": {
+            "world_model_rmse": 0.004542303197599727,
+            "persistence_rmse": 7.049255223817245e-06
+          },
+          "tray_center": {
+            "world_model_rmse": 0.0,
+            "persistence_rmse": 0.0
+          }
+        },
+        "contact_accuracy": 0.0,
+        "contact_f1": 0.0
+      }
+    },
+    "longest_common_episode": {
+      "steps": 560,
+      "seconds": 11.2,
+      "episode_count": 32,
+      "groups": {
+        "ee_position": {
+          "world_model_rmse": 0.09380189329385757,
+          "persistence_rmse": 0.16335400566458702
+        },
+        "arm_position": {
+          "world_model_rmse": 0.14775977842509747,
+          "persistence_rmse": 0.18538763374090195
+        },
+        "arm_velocity": {
+          "world_model_rmse": 0.05785682890564203,
+          "persistence_rmse": 0.03382487688213587
+        },
+        "package_position": {
+          "world_model_rmse": 0.1063926974311471,
+          "persistence_rmse": 0.10932963341474533
+        },
+        "package_orientation": {
+          "world_model_rmse": 0.3884541466832161,
+          "persistence_rmse": 0.3684513494372368
+        },
+        "package_linear_velocity": {
+          "world_model_rmse": 0.022607188438996673,
+          "persistence_rmse": 0.01532507291994989
+        },
+        "package_angular_velocity": {
+          "world_model_rmse": 0.2806757716462016,
+          "persistence_rmse": 0.060128622222691774
+        },
+        "gripper_aperture": {
+          "world_model_rmse": 0.027103765634819865,
+          "persistence_rmse": 0.045199936255812645
+        },
+        "gripper_velocity": {
+          "world_model_rmse": 0.013803081645164639,
+          "persistence_rmse": 0.0027194814811082324
+        },
+        "tray_center": {
+          "world_model_rmse": 0.0,
+          "persistence_rmse": 0.0
+        }
+      },
+      "contact_accuracy": 0.5,
+      "contact_f1": 0.5,
+      "fold_std": {
+        "groups": {
+          "ee_position": {
+            "world_model_rmse": 0.02343088733792638,
+            "persistence_rmse": 0.012016583581956983
+          },
+          "arm_position": {
+            "world_model_rmse": 0.044767655362169666,
+            "persistence_rmse": 0.01910343787702891
+          },
+          "arm_velocity": {
+            "world_model_rmse": 0.019136430731555357,
+            "persistence_rmse": 0.0034412911349201046
+          },
+          "package_position": {
+            "world_model_rmse": 0.026661380010077104,
+            "persistence_rmse": 0.022450367777913628
+          },
+          "package_orientation": {
+            "world_model_rmse": 0.07530958142140035,
+            "persistence_rmse": 0.016190456340072344
+          },
+          "package_linear_velocity": {
+            "world_model_rmse": 0.01143634330645998,
+            "persistence_rmse": 0.00285663979457024
+          },
+          "package_angular_velocity": {
+            "world_model_rmse": 0.20761920981818022,
+            "persistence_rmse": 0.040298239158395054
+          },
+          "gripper_aperture": {
+            "world_model_rmse": 0.00976767030024993,
+            "persistence_rmse": 0.011782451504732852
+          },
+          "gripper_velocity": {
+            "world_model_rmse": 0.009476866654069195,
+            "persistence_rmse": 0.00271992180623529
+          },
+          "tray_center": {
+            "world_model_rmse": 0.0,
+            "persistence_rmse": 0.0
+          }
+        },
+        "contact_accuracy": 0.1767766952966369,
+        "contact_f1": 0.1767766952966369
+      }
+    }
+  },
+  "candidate_selection": {
+    "matched_episode_count": 32,
+    "source_clip_count": 16,
+    "informative_pair_count": 0,
+    "pairwise_tie_count": 16,
+    "pairwise_ranking_accuracy": null,
+    "mean_selection_regret": 0.0,
+    "cross_clip_informative_pair_count": 63,
+    "cross_clip_pairwise_tie_count": 15,
+    "cross_clip_pairwise_ranking_accuracy": 0.5,
+    "global_candidate_selection_regret": 1.0,
+    "method_summary": {
+      "direct": {
+        "episode_count": 16,
+        "robot_success_count": 7,
+        "robot_success_rate": 0.4375,
+        "mean_predicted_score": 0.6145833333333333
+      },
+      "confidence-aware": {
+        "episode_count": 16,
+        "robot_success_count": 7,
+        "robot_success_rate": 0.4375,
+        "mean_predicted_score": 0.6145833333333333
+      }
+    },
+    "mean_absolute_score_outcome_gap": 0.5104166666666667,
+    "score_interpretation": "fraction of six physical task criteria; not a calibrated probability"
+  },
+  "uncertainty_error_association": {
+    "measure": "Pearson correlation across held-out rollout steps",
+    "quantity": "ensemble disagreement vs package position error in metres",
+    "pearson_r": 0.3391963741470784,
+    "step_count": 25920
+  },
+  "evaluation_protocol": "All transitions from each source video, including both retargeting methods, are held out together. Complete contiguous episodes are rolled forward from the first state using recorded actions. Training and residual-gain calibration use training and inner-validation source videos only.",
+  "limitations": "Task scores are fractions of six simulator-observable criteria and are not calibrated probabilities. Outcomes are MuJoCo labels, not physical-robot results. The learned model predicts structured state trajectories rather than pixels or raw video."
+}
