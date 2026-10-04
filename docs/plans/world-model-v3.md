@@ -371,7 +371,11 @@ Per la diagnostica storica dei video definire inoltre `load_human_replays(result
 | 1,0 s | 8,00 mm | 8,26 mm | 16,66 mm | +0,215 mm [−0,232; +0,715] |
 | 2,0 s | 13,59 mm | 14,40 mm | 27,77 mm | +0,663 mm [−0,420; +1,832] |
 
-Entrambi i modelli migliorano la baseline di persistenza e la baseline a velocità costante; sugli eventi, M0 ottiene F1 0,378/0,424 (pinza/supporto) e M1 0,339/0,444. Tutte le finestre sono valide. Le differenze 4D/8D hanno intervalli appaiati che includono zero su tutti gli orizzonti; si prosegue con 8D per l'integrazione col controller perché valuta i comandi effettivi. Le 9 famiglie validation sono poche per una conclusione generale; nessuna metrica del test storico è stata usata per la selezione.
+Entrambi i modelli migliorano la baseline di persistenza e la baseline a velocità costante; sugli eventi, M0 ottiene F1 0,378/0,424 (pinza/supporto) e M1 0,339/0,444. Tutte le finestre sono valide. Le 9 famiglie validation sono poche per una conclusione generale; nessuna metrica del test storico è stata usata per la selezione.
+
+**Conferma multi-seed:** i seed `17,29,43` mantengono le stesse famiglie di split. Mediando seed e famiglie, RMSE posizione oggetto a 0,5/2,0 s: M0 `5,43/15,32 mm`, M1 `5,44/16,35 mm`, persistenza `9,98/27,57 mm`, velocità costante `14,62/58,39 mm`. IC bootstrap per famiglia al 95%: M0 `4,52–6,40 mm` e `14,02–16,52 mm`; M1 `4,53–6,39 mm` e `14,58–17,78 mm`. Differenza appaiata M1−M0: a 0,5 s `+0,009 mm` (IC `−0,093–+0,118`), a 2 s `+1,031 mm` (IC `+0,165–+1,947`). F1 medio eventi pinza/supporto: M0 `0,349/0,406`, M1 `0,347/0,424`. Report locale completo, con breakdown per seed e confronto bootstrap: `MORPH-local-data/world-model-v3/M0-M1-three-seed-validation-20261004.json`.
+
+Per l'integrazione si mantiene `actuator8`, che rappresenta il comando realmente applicato. Il suo svantaggio misurato a 2 s limita l'orizzonte operativo: il planner iniziale non supera 1 s e Task 5 deve verificare il curriculum fino a 2 s prima di qualunque uso più lungo. L'effetto 4D/8D resta piccolo rispetto ai guadagni contro le baseline semplici.
 
 **Decisione:** continuare con `actuator8` per le fasi successive. Se le prestazioni peggiorano nettamente, verificare prima unità, ordine, alignment, gripper e stato omesso; il semplice aumento di epoche non è la prima correzione.
 
