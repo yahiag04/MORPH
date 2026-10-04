@@ -1,6 +1,6 @@
 # MORPH World Model V3 — piano di continuazione
 
-**Aggiornato:** 4 ottobre 2026
+**Aggiornato:** 5 ottobre 2026
 **Ultimo commit pubblicato:** `84d4314` — `feat: train contact-aware multistep dynamics`
 
 Questo file registra lo stato verificato del progetto, l'ordine delle attività rimanenti e i criteri per dichiararlo pronto. Per i contratti tecnici completi consultare [`world-model-v3.md`](world-model-v3.md); questo documento serve a riprendere il lavoro senza rifare attività già concluse.
@@ -21,19 +21,21 @@ Il risultato riguarda la simulazione e usa lo stato strutturato del simulatore. 
 
 I test V3 sono passati (41 test) e quelli del collector controfattuale sono passati (5 test). Sono inoltre passati CLI help, compilazione Python e `git diff --check`. Non aggiungere pesi/checkpoint, dataset grezzi, video originali o percorsi personali a Git.
 
-### Training M1 in corso
+### M1 completo; M2 in corso
 
-Run locale di sviluppo: `world-model-v3/M1-expanded-seed17-20261004`, configurazione `configs/world_model_v3/m1-expanded.json`, seed 17, 3 membri, massimo 40 epoche per membro, patience 8, CPU. Usa lo split train/validation combinato degli archivi corretti; il test non è stato caricato per scegliere il modello.
+M1, configurazione `configs/world_model_v3/m1-expanded.json`, seed 17, 3 membri, patience 8, CPU, è completo nel run locale `world-model-v3/M1-expanded-seed17-20261004`. Usa lo split train/validation combinato degli archivi corretti; il test non è stato caricato per scegliere il modello.
 
-All'ultimo controllo:
+Epoche e checkpoint selezionati:
 
 | Membro | Stato | Epoche completate | Best validation loss | Epoca del best |
 | --- | --- | ---: | ---: | ---: |
 | 0 | completato | 26 | 0,09915 | 18 |
 | 1 | completato | 27 | 0,09881 | 19 |
-| 2 | in corso | 23 | 0,09705 | 22 |
+| 2 | completato | 40 | 0,09419 | 34 |
 
-Ogni epoca impiega circa 57–60 secondi. Il processo era attivo e salvava `status.json`, `training.jsonl` e checkpoint a ogni epoca. Prima di riprendere, controllare lo stato effettivo: il processo può avere terminato dopo questo aggiornamento.
+M1 ha prodotto `validation.json` e `validation_events.json`. RMSE posizione scatola, validation uniforme: 1,31/4,20/7,23/13,15 mm a 0,1/0,5/1/2 s; persistenza: 3,04/9,36/15,39/24,80 mm. Finestre centrate sugli eventi: 3,32/13,69/13,53/14,10 mm contro 13,09/35,13/40,44/49,17 mm per la persistenza. F1 degli eventi di contatto a un passo: 0,637 pinza e 0,654 supporto. Report completo e intervalli bootstrap sono negli artefatti locali; il validation ha 29 famiglie, quindi l'evidenza resta limitata. L'orientamento durante gli eventi resta un limite.
+
+M2 con oversampling eventi è stato avviato il 5 ottobre 2026, seed 17, sullo stesso split, configurazione `configs/world_model_v3/event.json`, output locale `world-model-v3/M2-event-seed17-20261005`. Controllare prima lo stato effettivo e non lanciare duplicati. Le epoche precedenti impiegavano circa 57–60 secondi.
 
 ## Ripresa del run attivo
 
@@ -47,18 +49,18 @@ export MORPH_CONTACT_DATA="$MORPH_DATA_ROOT/contact-expansion-corrected-20261004
 export MORPH_COUNTERFACTUAL_DATA="$MORPH_V3_RUNS/counterfactual-development-compact-20261004"
 
 ps -Ao pid,etime,command | rg 'train_world_model_v3.py'
-cat "$MORPH_V3_RUNS/M1-expanded-seed17-20261004/status.json"
+cat "$MORPH_V3_RUNS/M2-event-seed17-20261005/status.json"
 ```
 
-Se il processo M1 è ancora attivo, **non avviarne una copia**. Se è terminato senza `status: complete`, controllare il log e riprendere solo se gli hash del manifest corrispondono:
+Se M2 è ancora attivo, **non avviarne una copia**. Se è terminato senza `status: complete`, controllare il log e riprendere solo se gli hash del manifest corrispondono:
 
 ```bash
 PYTHONPATH=src "$MORPH_TRAIN_PY" scripts/train_world_model_v3.py \
   --dataset-dir "$MORPH_CONTACT_DATA" \
   --dataset-dir "$MORPH_COUNTERFACTUAL_DATA" \
-  --config configs/world_model_v3/m1-expanded.json \
+  --config configs/world_model_v3/event.json \
   --seed 17 \
-  --output-dir "$MORPH_V3_RUNS/M1-expanded-seed17-20261004" \
+  --output-dir "$MORPH_V3_RUNS/M2-event-seed17-20261005" \
   --resume
 ```
 
