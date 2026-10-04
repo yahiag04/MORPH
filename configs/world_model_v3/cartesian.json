@@ -1,0 +1,17 @@
+{
+  "action_mode": "cartesian4",
+  "relative_features": false,
+  "ensemble_size": 3,
+  "hidden_dim": 128,
+  "seed": 17,
+  "epochs": 40,
+  "batch_size": 64,
+  "learning_rate": 0.0005,
+  "weight_decay": 0.00001,
+  "gradient_clip": 1.0,
+  "patience": 8,
+  "rollout_horizon": 25,
+  "window_stride": 5,
+  "observation_dt": 0.02,
+  "device": "cpu"
+}

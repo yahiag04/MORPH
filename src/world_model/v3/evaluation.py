@@ -338,6 +338,10 @@ def evaluate_dynamics(
         endpoint_phases: dict[str, dict[str, list[np.ndarray]]] = {
             name: {} for name in errors
         }
+        family_errors: dict[str, dict[str, dict[str, list[np.ndarray]]]] = {
+            model_name: {group: {} for group in STATE_GROUPS}
+            for model_name in errors
+        }
         contact_probabilities: list[np.ndarray] = []
         contact_truth: list[np.ndarray] = []
         family_windows: Counter[str] = Counter()
@@ -400,6 +404,7 @@ def evaluate_dynamics(
                         difference = path[1:, feature_slice] - truth_path[1:, feature_slice]
                         errors[name][group_name].append(difference)
                         endpoint_errors[name][group_name].append(difference[-1:])
+                        family_errors[name][group_name].setdefault(group, []).append(difference)
                         endpoint_phases[name].setdefault(phase, {}).setdefault(
                             group_name, []).append(difference[-1:])
                 member_contacts = probs[:, window_index]
@@ -443,6 +448,27 @@ def evaluate_dynamics(
             }
             for model_name, by_phase in endpoint_phases.items()
         }
+        bootstrap_metrics = {}
+        per_family_metrics = {}
+        for group_name in STATE_GROUPS:
+            family_rows = []
+            for family in sorted(set().union(*(
+                set(family_errors[name][group_name]) for name in family_errors
+            ))):
+                metrics = {}
+                for model_name in family_errors:
+                    values = family_errors[model_name][group_name].get(family, [])
+                    metrics[f"{model_name}_rmse"] = (
+                        float(np.sqrt(np.mean(np.square(np.concatenate(values), dtype=np.float64))))
+                        if values else 0.0
+                    )
+                family_rows.append({"group_id": family, "metrics": metrics})
+            per_family_metrics[group_name] = {
+                row["group_id"]: row["metrics"] for row in family_rows
+            }
+            bootstrap_metrics[group_name] = bootstrap_families(
+                family_rows, seed=20261004, samples=2000,
+            ) if family_rows else None
         if contact_probabilities:
             endpoint_prob = np.stack(contact_probabilities, axis=0)
             endpoint_truth = np.stack(contact_truth, axis=0)
@@ -458,6 +484,8 @@ def evaluate_dynamics(
             "window_count": expected_windows, "valid_window_count": valid_windows,
             "valid_member_fraction": None if member_slots == 0 else valid_members / member_slots,
             "groups": group_metrics, "orientation": orientation_metric,
+            "family_cluster_bootstrap": bootstrap_metrics,
+            "per_family_metrics": per_family_metrics,
             "endpoint_rmse_by_phase": phase_metrics,
             "family_count": len(family_windows),
             "endpoint_contacts": endpoint_contact,

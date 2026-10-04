@@ -352,15 +352,26 @@ Per la diagnostica storica dei video definire inoltre `load_human_replays(result
 **Creare:** `v3/model.py`, `v3/training.py`, `scripts/train_world_model_v3.py`, configurazioni cartesian/actuator e test modello/training.
 **Interfaccia training:** `fit_dynamics(train: EpisodeBatch, validation: EpisodeBatch, *, config: dict, output_dir: Path) -> DynamicsV3`.
 
-- [ ] Scrivere test per dimensioni 4D/8D, dipendenza effettiva dalle azioni su un sistema lineare noto, conservazione del vassoio, quaternioni validi, riproducibilità con seed, rifiuto checkpoint incompatibili e normalizzazione indipendente dai dati validation/test.
-- [ ] Implementare tre MLP con tre strati nascosti da 128 e SiLU, head per 32 delta continui e due logits contatto. Bootstrap per famiglia, conservando le sequenze. Non aumentare capacità in questa ablation.
-- [ ] Per M0/M1 usare la stessa loss tipo V2 e rollout di 25 passi, con guadagni residui tutti 1 e calibrazione disattivata. Conservare il report V2 calibrato come riferimento storico distinto. Un'eventuale ablation della calibrazione è successiva, dichiarata e usa solo validation.
-- [ ] Validare ogni membro a intervalli fissi di un'epoca, sulla stessa lista deterministica di finestre validation. Criterio checkpoint: media delle loss validation per famiglia; per gli esperimenti successivi riportare sempre anche RMSE oggetto e F1 eventi per scegliere la configurazione finale.
-- [ ] Implementare manifest, resume verificato, `best`/`last`, log JSONL e stop per valori non finiti. Un run interrotto non deve apparire completato.
-- [ ] Eseguire test modello e training con `-p 'test_world_model_v3_model.py'` e `-p 'test_world_model_v3_training.py'` nell'interprete PyTorch. Usare dati sintetici piccoli nei test; i training reali sono esperimenti separati.
-- [ ] Eseguire dry run, pilot temporale e M0/M1 con lo stesso split 42/9, seed e budget. Non leggere le 9 famiglie test storiche per la selezione della configurazione.
-- [ ] Salvare tabella comparativa con durata, errori, F1 eventi, guadagni residui, finestre e famiglie. Se cambia una dipendenza, invalidare il checkpoint attraverso il manifest.
-- [ ] Commit: `feat: train actuator-conditioned dynamics`.
+- [x] Scrivere test per dimensioni 4D/8D, dipendenza effettiva dalle azioni su un sistema lineare noto, conservazione del vassoio, quaternioni validi, riproducibilità con seed, rifiuto checkpoint incompatibili e normalizzazione indipendente dai dati validation/test.
+- [x] Implementare tre MLP con tre strati nascosti da 128 e SiLU, head per 32 delta continui e due logits contatto. Bootstrap per famiglia, conservando le sequenze. Non aumentare capacità in questa ablation.
+- [x] Per M0/M1 usare la stessa loss tipo V2 e rollout di 25 passi, con guadagni residui tutti 1 e calibrazione disattivata. Conservare il report V2 calibrato come riferimento storico distinto. Un'eventuale ablation della calibrazione è successiva, dichiarata e usa solo validation.
+- [x] Validare ogni membro a intervalli fissi di un'epoca, sulla stessa lista deterministica di finestre validation. Criterio checkpoint: media delle loss validation per famiglia; per gli esperimenti successivi riportare sempre anche RMSE oggetto e F1 eventi per scegliere la configurazione finale.
+- [x] Implementare manifest, resume verificato, `best`/`last`, log JSONL e stop per valori non finiti. Un run interrotto non deve apparire completato.
+- [x] Eseguire test modello e training con `-p 'test_world_model_v3_model.py'` e `-p 'test_world_model_v3_training.py'` nell'interprete PyTorch. Usare dati sintetici piccoli nei test; i training reali sono esperimenti separati.
+- [x] Eseguire dry run, pilot temporale e M0/M1 con lo stesso split 42/9, seed e budget. Non leggere le 9 famiglie test storiche per la selezione della configurazione.
+- [x] Salvare tabella comparativa con durata, errori, F1 eventi, guadagni residui, finestre e famiglie. Se cambia una dipendenza, invalidare il checkpoint attraverso il manifest.
+- [x] Commit: `feat: train actuator-conditioned dynamics`.
+
+**Evidenza:** suite completa simulator 171 test OK, 21 skip nell'interprete senza PyTorch; i 30 test V3 per data/evaluation/model/training sono stati eseguiti nei runtime previsti. Dry run 4/2 completato; pilot 5 epoche su 42/9 richiede circa 58 s di training per modello. M0/M1 seed 17 sono stati allenati fino all'early stopping: M0 `(26,16,20)` epoche, M1 `(27,16,19)`, circa 239 s di training ciascuno, calibrazione esclusa e guadagni unitari. Report aggregato fuori Git: `MORPH-local-data/world-model-v3/M0-M1-development-comparison-20261004.json`.
+
+| Orizzonte | M0 4D RMSE oggetto | M1 8D RMSE oggetto | Persistenza | M0/M1: differenza appaiata 8D−4D (IC 95%) |
+| --- | ---: | ---: | ---: | ---: |
+| 0,1 s | 1,56 mm | 1,45 mm | 3,07 mm | −0,104 mm [−0,225; +0,012] |
+| 0,5 s | 5,35 mm | 5,50 mm | 10,05 mm | +0,154 mm [−0,020; +0,319] |
+| 1,0 s | 8,00 mm | 8,26 mm | 16,66 mm | +0,215 mm [−0,232; +0,715] |
+| 2,0 s | 13,59 mm | 14,40 mm | 27,77 mm | +0,663 mm [−0,420; +1,832] |
+
+Entrambi i modelli migliorano la baseline di persistenza e la baseline a velocità costante; sugli eventi, M0 ottiene F1 0,378/0,424 (pinza/supporto) e M1 0,339/0,444. Tutte le finestre sono valide. Le differenze 4D/8D hanno intervalli appaiati che includono zero su tutti gli orizzonti; si prosegue con 8D per l'integrazione col controller perché valuta i comandi effettivi. Le 9 famiglie validation sono poche per una conclusione generale; nessuna metrica del test storico è stata usata per la selezione.
 
 **Decisione:** continuare con `actuator8` per le fasi successive. Se le prestazioni peggiorano nettamente, verificare prima unità, ordine, alignment, gripper e stato omesso; il semplice aumento di epoche non è la prima correzione.
 

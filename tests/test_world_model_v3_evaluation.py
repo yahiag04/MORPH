@@ -68,6 +68,12 @@ class EvaluationTests(unittest.TestCase):
         five = report["horizons"]["5"]
         self.assertAlmostEqual(one["groups"]["ee_position"]["model_rmse"], 0.0, places=7)
         self.assertGreater(one["groups"]["ee_position"]["persistence_rmse"], 0.0)
+        self.assertEqual(
+            one["family_cluster_bootstrap"]["package_position"]["family_count"], 1,
+        )
+        self.assertEqual(
+            set(one["per_family_metrics"]["package_position"]), {"family-a"},
+        )
         self.assertAlmostEqual(five["groups"]["package_position"]["model_rmse"], 0.0, places=7)
         self.assertGreater(five["groups"]["package_position"]["constant_velocity_rmse"], 0.0)
         self.assertEqual(five["orientation"]["model"]["endpoint_mean_radians"], 0.0)
