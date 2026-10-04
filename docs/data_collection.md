@@ -61,6 +61,8 @@ The contact replay succeeded on 5/16 direct-retargeted episodes and 4/16 confide
 
 Contact replay now logs observations every 10 physics steps (20 ms in the default scene), independently of control updates every 50 physics steps (100 ms). Settling after release is also recorded. Changing the observation frequency does not change the held actuator commands or the simulation outcome. The observer interval must divide the controller interval.
 
+Derived positions and contact flags are refreshed with `mj_forward` on a reusable copy of the simulator data. This keeps them aligned with the current joint positions and velocities without changing the live controller state.
+
 Schema 3 NPZ files retain `states`, `actions` and `next_states`, and add `actuator_controls` (eight values), `simulation_start_times`, `simulation_end_times`, `transition_dt_seconds`, `episode_ids`, `group_ids`, `source_kinds` and `splits`. `phases` includes `settle`. Simulation clocks determine durations; video timestamps are not a substitute for these clocks.
 
 ```bash
@@ -73,3 +75,5 @@ This creates 240 synthetic episodes from 60 independently seeded layout/yaw fami
 The family partition is fixed before simulation: 168 training, 36 validation and 36 test episodes. Keep all variants of a family together; never concatenate the reserved test partition into training or reassign rows by a random transition split. The existing video-training commands reject predefined synthetic partitions. The test data are reserved for the next model evaluation, and are only checked for archive integrity during collection.
 
 `manifest.json` contains per-episode parameters, relative archive paths, outcomes, software versions and source hashes. It also records a compiled MuJoCo `.mjb` snapshot and its SHA-256 digest; the scene XML digest alone would miss changes in included XML files. `summary.json` reports aggregate coverage and collection errors. Both are saved with the archives outside the repository; only the aggregate summary is published. Existing nonempty destinations are rejected to preserve previous collections. These episodes add no human demonstrations to the 16-video count.
+
+Training checkpoints also retain their observation interval. Cross-validation refuses to compare a checkpoint with data sampled at a different interval; old checkpoints without timing require an explicit, verified `--checkpoint-dt-seconds` value.

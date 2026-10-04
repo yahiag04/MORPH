@@ -1,6 +1,7 @@
 """Tests for clip-held-out action-conditioned dynamics prediction."""
 
 import importlib.util
+import tempfile
 import unittest
 
 import numpy as np
@@ -8,10 +9,22 @@ import numpy as np
 from world_model.state_dynamics import (
     ACTION_DIM, CONTACT_STATE_INDICES, STATE_DIM, StateDynamicsModel,
     StateDynamicsFit, split_by_clip, validate_transitions,
+    resolve_checkpoint_interval,
 )
 
 
 class StateDynamicsDataTests(unittest.TestCase):
+    def test_checkpoint_interval_is_preserved_and_must_match_evaluation(self):
+        self.assertEqual(resolve_checkpoint_interval(.02, .02), .02)
+        self.assertEqual(resolve_checkpoint_interval(.1, None), .1)
+        with self.assertRaisesRegex(ValueError, 'does not match'):
+            resolve_checkpoint_interval(.1, .02)
+        with self.assertRaisesRegex(ValueError, 'no recorded'):
+            resolve_checkpoint_interval(None, .02)
+        for value in (0.0, -0.1, np.inf):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'positive'):
+                resolve_checkpoint_interval(value, None)
+
     def test_declares_ordered_state_and_action_dimensions(self):
         self.assertEqual(STATE_DIM, 37)
         self.assertEqual(ACTION_DIM, 4)
@@ -59,6 +72,26 @@ class StateDynamicsDataTests(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec("torch"), "optional PyTorch runtime is not installed")
 class StateDynamicsModelTests(unittest.TestCase):
+    def test_checkpoint_round_trip_preserves_training_interval(self):
+        from world_model.state_dynamics import (
+            DynamicsNormalizer, StateDynamicsEnsemble, load_checkpoint, save_checkpoint,
+        )
+
+        states = np.zeros((4, STATE_DIM), dtype=np.float32)
+        states[:, 20] = 1.0
+        actions = np.zeros((4, ACTION_DIM), dtype=np.float32)
+        normalizer = DynamicsNormalizer.fit(states, actions, states.copy())
+        fit = StateDynamicsFit(StateDynamicsEnsemble(count=2), normalizer,
+                               ("train",), ("validation",), {}, transition_dt_seconds=.02)
+        with tempfile.TemporaryDirectory() as folder:
+            path = f"{folder}/model.pt"
+            save_checkpoint(fit, path)
+            loaded = load_checkpoint(path)
+            self.assertEqual(loaded.transition_dt_seconds, .02)
+            self.assertEqual(load_checkpoint(path, legacy_interval=.02).transition_dt_seconds, .02)
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                load_checkpoint(path, legacy_interval=.1)
+
     def test_predicts_next_state_with_the_declared_shape(self):
         from world_model.state_dynamics import StateDynamicsModel
         import torch

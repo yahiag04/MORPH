@@ -199,6 +199,27 @@ class StateDynamicsFit:
     train_clip_ids: tuple[str, ...]
     validation_clip_ids: tuple[str, ...]
     metrics: dict
+    transition_dt_seconds: float | None = None
+
+
+def resolve_checkpoint_interval(
+    checkpoint_interval: float | None, evaluation_interval: float | None,
+) -> float | None:
+    """Reject an evaluation interval that cannot be tied to checkpoint training."""
+    for name, value in (("checkpoint", checkpoint_interval), ("evaluation", evaluation_interval)):
+        if value is not None and (not np.isfinite(value) or value <= 0):
+            raise ValueError(f"{name} transition interval must be finite and positive")
+    if checkpoint_interval is None:
+        if evaluation_interval is not None:
+            raise ValueError(
+                "checkpoint has no recorded training interval; reload it with an explicit legacy interval"
+            )
+        return None
+    if evaluation_interval is not None and not np.isclose(
+        checkpoint_interval, evaluation_interval, rtol=1e-7, atol=1e-9
+    ):
+        raise ValueError("evaluation interval does not match checkpoint training interval")
+    return float(checkpoint_interval)
 
 
 def _normalizer_tensors(normalizer: DynamicsNormalizer, device="cpu") -> dict[str, Any]:
@@ -548,7 +569,10 @@ def fit_state_dynamics(
         "validation_calibrated_residual_gains": rollout_gains,
         "groups": groups,
     }
-    return StateDynamicsFit(ensemble, normalizer, split.train_clip_ids, split.validation_clip_ids, metrics)
+    return StateDynamicsFit(
+        ensemble, normalizer, split.train_clip_ids, split.validation_clip_ids, metrics,
+        transition_dt_seconds=transition_dt_seconds,
+    )
 
 
 def evaluate_state_dynamics(
@@ -558,6 +582,9 @@ def evaluate_state_dynamics(
     transition_dt_seconds: float | None = None,
 ) -> dict:
     """Evaluate a fitted model on a fully separate set of clip groups."""
+    transition_dt_seconds = resolve_checkpoint_interval(
+        fit.transition_dt_seconds, transition_dt_seconds
+    )
     states, actions, next_states = validate_transitions(states, actions, next_states)
     clips = np.asarray(clip_ids).astype(str)
     episodes = clips.copy() if episode_ids is None else np.asarray(episode_ids).astype(str)
@@ -601,14 +628,21 @@ def save_checkpoint(fit: StateDynamicsFit, destination: str) -> None:
         )},
         "train_clip_ids": fit.train_clip_ids,
         "validation_clip_ids": fit.validation_clip_ids,
+        "transition_dt_seconds": fit.transition_dt_seconds,
     }, destination)
 
 
-def load_checkpoint(source: str) -> StateDynamicsFit:
+def load_checkpoint(source: str, *, legacy_interval: float | None = None) -> StateDynamicsFit:
     """Load a locally saved V2 checkpoint for evaluation or rollout."""
     if torch is None:
         raise ImportError("loading world-model checkpoints requires PyTorch")
     checkpoint = torch.load(source, map_location="cpu", weights_only=False)
+    checkpoint_interval = checkpoint.get("transition_dt_seconds")
+    if checkpoint_interval is None:
+        checkpoint_interval = legacy_interval
+    elif legacy_interval is not None:
+        resolve_checkpoint_interval(checkpoint_interval, legacy_interval)
+    checkpoint_interval = resolve_checkpoint_interval(checkpoint_interval, None)
     if checkpoint.get("state_dim") != STATE_DIM or checkpoint.get("action_dim") != ACTION_DIM:
         raise ValueError("checkpoint dimensions do not match the V2 state and action schema")
     model = StateDynamicsEnsemble(
@@ -623,4 +657,5 @@ def load_checkpoint(source: str) -> StateDynamicsFit:
         model=model, normalizer=normalizer,
         train_clip_ids=tuple(checkpoint["train_clip_ids"]),
         validation_clip_ids=tuple(checkpoint["validation_clip_ids"]), metrics={},
+        transition_dt_seconds=checkpoint_interval,
     )

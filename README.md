@@ -85,7 +85,7 @@ V1 used a 19-value state and reported a pooled normalized RMSE of 0.3272 versus 
 
 ## Expanded simulation dataset
 
-A separate collection contains **240 synthetic episodes and 207,670 transitions at 50 Hz**, from 60 randomized scenario families. Layout, package yaw, speed, pickup estimation error and release behavior vary. The dataset includes 71 successful transfers, 169 observed failures, 12,000 settling transitions and 1,009 contact changes. These are outcomes of the collection controller, not results from a newly trained world model. The human dataset remains 16 videos.
+A separate collection contains **240 synthetic episodes and 207,670 transitions at 50 Hz**, from 60 randomized scenario families. Layout, package yaw, speed, pickup estimation error and release behavior vary. The dataset includes 71 successful transfers, 169 observed failures, 12,000 settling transitions and 997 contact changes. Observations refresh derived positions and contacts from the current joint state on a simulator snapshot. These are outcomes of the collection controller, not results from a newly trained world model. The human dataset remains 16 videos.
 
 Whole scenario families are assigned to training (168 episodes), validation (36) or test (36) before simulation. Each transition includes measured simulation times and the eight actuator commands; the controller still updates every 100 ms while observations are logged every 20 ms. Archives and the reproduction manifest stay local. Aggregate coverage is in [`results/metrics/contact_dataset.json`](results/metrics/contact_dataset.json).
 
@@ -169,7 +169,7 @@ PYTHONPATH=src python scripts/train_world_model.py \
 
 The command saves the checkpoint and clip-level details locally. The checked-in metrics and figure contain aggregate values only. `--help` lists available training options.
 
-For legacy archives without timing metadata, supply their verified interval explicitly, for example `--transition-dt-seconds 0.1` for the original V2 archives. The loader rejects missing or inconsistent timing. Synthetic archives have predefined partitions and are deliberately rejected by these video-splitting commands; the next model training stage must consume their supplied train/validation/test assignments.
+For legacy archives without timing metadata, supply their verified interval explicitly, for example `--transition-dt-seconds 0.1` for the original V2 archives. CV evaluation also checks the training interval stored in each checkpoint; for older checkpoints, pass a verified `--checkpoint-dt-seconds` value. The loader rejects missing or inconsistent timing. Synthetic archives have predefined partitions and are deliberately rejected by these video-splitting commands; the next model training stage must consume their supplied train/validation/test assignments.
 
 ### Collect additional simulated episodes
 

@@ -165,7 +165,9 @@ def collect_dataset(output_dir: Path, *, families: int = 60, seed: int = 2026,
     episodes_dir.mkdir()
     source_files = [Path(__file__), Path(__file__).with_name('contact_demo_evaluator.py'),
                     Path(__file__).parents[1]/'simulation'/'demonstration_manipulation.py',
-                    Path(__file__).parents[1]/'simulation'/'contact_manipulation_env.py']
+                    Path(__file__).parents[1]/'simulation'/'contact_manipulation_env.py',
+                    Path(__file__).parents[1]/'simulation'/'panda_env.py',
+                    Path(__file__).parents[1]/'simulation'/'ik.py']
     source_content = {p.name: p.read_bytes() for p in source_files}
     source_dir = output_dir / 'collection_source'
     source_dir.mkdir()

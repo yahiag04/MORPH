@@ -44,7 +44,7 @@
     "release": 23645,
     "settle": 12000
   },
-  "contact_changes": 1009,
+  "contact_changes": 997,
   "package_moving_transitions": 62686,
   "interpretation": "Coverage of a synthetic collection policy, not learned-controller performance. Object mass, friction and geometry are fixed; positions, yaw and commands vary. The test partition has not been used for model selection.",
   "families_by_split": {

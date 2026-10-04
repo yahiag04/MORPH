@@ -65,6 +65,8 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--transition-dt-seconds", type=float,
                         help="explicit interval for legacy archives without timing metadata")
+    parser.add_argument("--checkpoint-dt-seconds", type=float,
+                        help="explicit training interval for legacy checkpoints without timing metadata")
     args = parser.parse_args()
     output_dir = args.output_dir.expanduser().resolve()
     if output_dir == ROOT or ROOT in output_dir.parents:
@@ -87,7 +89,7 @@ def main() -> int:
         train_mask = ~test_mask
         checkpoint_path = output_dir / f"fold_{fold_index + 1}_state_dynamics.pt"
         if checkpoint_path.is_file():
-            fit = load_checkpoint(str(checkpoint_path))
+            fit = load_checkpoint(str(checkpoint_path), legacy_interval=args.checkpoint_dt_seconds)
         else:
             fit = fit_state_dynamics(
                 data["states"][train_mask], data["actions"][train_mask],
