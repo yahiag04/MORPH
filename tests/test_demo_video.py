@@ -10,7 +10,7 @@ from unittest import mock
 import cv2
 import numpy as np
 
-from evaluation.demo_video import make_paired_video
+from evaluation.demo_video import PANEL_TITLES, make_paired_video
 from scripts.make_paired_demo import main as make_paired_demo_main
 
 
@@ -39,6 +39,26 @@ def read_frames(path: Path):
 
 
 class DemoVideoTests(unittest.TestCase):
+    def test_public_showcase_output_requires_opt_in_and_is_narrowly_scoped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = (Path(directory) / "repo").resolve()
+            public_output = root / "results" / "videos" / "human_to_panda.mp4"
+            real = Path(directory) / "real.mp4"
+            robot = Path(directory) / "robot.mp4"
+            write_color_video(real, [(20, 20, 20)])
+            write_color_video(robot, [(80, 80, 80)])
+            with mock.patch("evaluation.demo_video.REPOSITORY_ROOT", root), mock.patch(
+                "evaluation.demo_video.PUBLIC_SHOWCASE_PATH", public_output
+            ):
+                with self.assertRaisesRegex(ValueError, "outside the repository"):
+                    make_paired_video(real, robot, public_output)
+                with self.assertRaisesRegex(ValueError, "limited to"):
+                    make_paired_video(real, robot, root / "results/videos/other.mp4", public_showcase=True)
+                result = make_paired_video(real, robot, public_output, public_showcase=True)
+            self.assertEqual(result, public_output)
+            self.assertTrue(result.is_file())
+        self.assertEqual(PANEL_TITLES, ("Human demonstration", "MuJoCo Panda replay"))
+
     def test_pairs_sources_with_normalized_progress_and_labels(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -54,12 +74,12 @@ class DemoVideoTests(unittest.TestCase):
 
             self.assertEqual(result, output.resolve())
             self.assertEqual(len(frames), 4)
-            self.assertEqual(frames[0].shape, (688, 1000, 3))
+            self.assertEqual(frames[0].shape, (408, 1120, 3))
             self.assertGreater(np.count_nonzero(frames[0][:48] > 180), 0)
             # The shorter source holds each endpoint across normalized progress.
-            human_panel = frames[1][48 + 320, 180]
+            human_panel = frames[1][48 + 180, 320]
             self.assertLess(abs(int(human_panel[0]) - 20), 12)
-            human_panel_end = frames[2][48 + 320, 180]
+            human_panel_end = frames[2][48 + 180, 320]
             self.assertLess(abs(int(human_panel_end[0]) - 80), 12)
             self.assertEqual(real.read_bytes(), real_bytes)
             self.assertEqual(robot.read_bytes(), robot_bytes)

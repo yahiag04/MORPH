@@ -6,7 +6,9 @@ from pathlib import Path
 
 import numpy as np
 
-from evaluation.demo_video import make_paired_video, render_panda_trajectory
+from evaluation.demo_video import (
+    PUBLIC_SHOWCASE_PATH, make_paired_video, render_panda_trajectory,
+)
 
 
 def _reject_output_input_aliases(output_paths: list[Path], inputs: list[Path]) -> None:
@@ -39,10 +41,12 @@ def read_trajectory(path: Path) -> np.ndarray:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("tracked_video", type=Path, help="Annotated real demonstration MP4")
+    parser.add_argument("tracked_video", type=Path, help="Raw or annotated human demonstration video")
     parser.add_argument("trajectory_csv", type=Path, help="Retargeted XYZ CSV from the evaluator")
     parser.add_argument("--output-dir", required=True, type=Path, help="Local directory outside the repository")
     parser.add_argument("--model-path", type=Path, help="Optional Panda scene XML path")
+    parser.add_argument("--public-showcase", action="store_true",
+                        help="write the derived paired comparison to results/videos/human_to_panda.mp4")
     args = parser.parse_args()
     tracked_video = args.tracked_video.expanduser().resolve()
     trajectory_csv = args.trajectory_csv.expanduser().resolve()
@@ -55,7 +59,7 @@ def main() -> None:
     if output_dir == repo_root or repo_root in output_dir.parents:
         parser.error("output directory must be outside the repository to keep personal videos local")
     robot_output = output_dir / "panda_replay.mp4"
-    paired_output = output_dir / "human_panda_paired.mp4"
+    paired_output = PUBLIC_SHOWCASE_PATH if args.public_showcase else output_dir / "human_panda_paired.mp4"
     try:
         _reject_output_input_aliases([robot_output, paired_output], [tracked_video, trajectory_csv])
     except ValueError as error:
@@ -71,6 +75,7 @@ def main() -> None:
         tracked_video,
         robot_video,
         paired_output,
+        public_showcase=args.public_showcase,
     )
     print(f"Panda replay: {robot_video}")
     print(f"Paired demo: {paired_video}")

@@ -13,22 +13,33 @@ from simulation.panda_env import PandaEnv
 from simulation.trajectory_player import CartesianTrajectoryPlayer
 
 
-ROBOT_WIDTH = 640
-ROBOT_HEIGHT = 480
-PANEL_HEIGHT = 640
-HUMAN_WIDTH = 360
+ROBOT_WIDTH = 480
+ROBOT_HEIGHT = 360
+PANEL_HEIGHT = 360
+HUMAN_WIDTH = 640
 HEADER_HEIGHT = 48
 OUTPUT_WIDTH = HUMAN_WIDTH + ROBOT_WIDTH
 OUTPUT_HEIGHT = PANEL_HEIGHT + HEADER_HEIGHT
 BACKGROUND = (19, 22, 26)
+PANEL_TITLES = ("Human demonstration", "MuJoCo Panda replay")
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+PUBLIC_SHOWCASE_PATH = REPOSITORY_ROOT / "results" / "videos" / "human_to_panda.mp4"
 
 
 def _local_output_path(path: str | Path) -> Path:
     """Resolve an output and reject media paths inside the Git checkout."""
     output = Path(path).expanduser().resolve()
-    repository_root = Path(__file__).resolve().parents[2]
+    repository_root = REPOSITORY_ROOT
     if output == repository_root or repository_root in output.parents:
         raise ValueError("real and derived videos must be saved outside the repository")
+    return output
+
+
+def _showcase_output_path(path: str | Path) -> Path:
+    """Allow only the one documented derived comparison asset into the repo."""
+    output = Path(path).expanduser().resolve()
+    if output != PUBLIC_SHOWCASE_PATH.resolve():
+        raise ValueError(f"public showcase output is limited to {PUBLIC_SHOWCASE_PATH}")
     return output
 
 
@@ -146,11 +157,13 @@ def make_paired_video(
     robot_path: str | Path,
     output_path: str | Path,
     fps: float = 30.0,
+    *,
+    public_showcase: bool = False,
 ) -> Path:
-    """Pair two videos by normalized progress, preserving both input files."""
+    """Pair videos by normalized progress; public output requires explicit opt-in."""
     real = Path(real_path).expanduser().resolve()
     robot = Path(robot_path).expanduser().resolve()
-    output = _local_output_path(output_path)
+    output = _showcase_output_path(output_path) if public_showcase else _local_output_path(output_path)
     if not real.is_file() or not robot.is_file():
         raise FileNotFoundError("both the real demonstration and Panda replay videos must exist")
     if output in {real, robot}:
@@ -196,8 +209,8 @@ def make_paired_video(
             canvas = np.full((OUTPUT_HEIGHT, OUTPUT_WIDTH, 3), BACKGROUND, dtype=np.uint8)
             canvas[HEADER_HEIGHT:, :HUMAN_WIDTH] = human_panel
             canvas[HEADER_HEIGHT:, HUMAN_WIDTH:] = robot_panel
-            _draw_title(canvas, "HUMAN DEMONSTRATION", 0, HUMAN_WIDTH, (64, 88, 107))
-            _draw_title(canvas, "FRANKA PANDA REPLAY", HUMAN_WIDTH, ROBOT_WIDTH, (55, 102, 89))
+            _draw_title(canvas, PANEL_TITLES[0], 0, HUMAN_WIDTH, (64, 88, 107))
+            _draw_title(canvas, PANEL_TITLES[1], HUMAN_WIDTH, ROBOT_WIDTH, (55, 102, 89))
             writer.write(canvas)
     finally:
         real_capture.release()
