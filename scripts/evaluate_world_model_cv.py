@@ -17,6 +17,7 @@ from world_model.state_dynamics import (
     calibrate_rollout_gains, evaluate_state_dynamics, fit_state_dynamics,
     load_checkpoint, save_checkpoint,
 )
+from world_model.fidelity import assign_outer_folds, load_episode_outcomes, validate_episode_outcomes
 from world_model.transition_timing import transition_interval
 
 
@@ -30,16 +31,37 @@ def _load_pair(path: Path, method: str, legacy_interval: float | None = None) ->
                 ("source_kinds" in archive and np.any(archive["source_kinds"] != "human_replay"))):
             raise ValueError("use the predefined scenario partitions for synthetic data; video splitting is not applicable")
         data = {key: archive[key] for key in required}
+        count = len(data["states"])
+        for key in required:
+            if len(data[key]) != count:
+                raise ValueError(f"{path} arrays must have matching transition counts")
+        for key in ("human_labels", "phases"):
+            data[key] = archive[key] if key in archive.files else np.full(count, "", dtype=str)
+            if data[key].shape != (count,):
+                raise ValueError(f"{path} {key} must have one value per transition")
+        if "episode_ids" in archive.files:
+            data["episode_ids"] = archive["episode_ids"].astype(str)
         data["dt_seconds"] = transition_interval(archive.get("transition_dt_seconds"),
                                                 count=len(data["states"]), legacy_interval=legacy_interval)
     data["clip_ids"] = data["clip_ids"].astype(str)
-    data["episode_ids"] = np.char.add(data["clip_ids"], f":{method}")
+    expected_episode_ids = np.char.add(data["clip_ids"], f":{method}")
+    if "episode_ids" in data:
+        if data["episode_ids"].shape != (len(data["clip_ids"]),) or not np.array_equal(
+            data["episode_ids"], expected_episode_ids
+        ):
+            raise ValueError(f"{path} episode_ids do not match clip_ids and method {method!r}")
+    else:
+        data["episode_ids"] = expected_episode_ids
+    data["human_labels"] = data["human_labels"].astype(str)
+    data["phases"] = data["phases"].astype(str)
+    data["method_ids"] = np.full(len(data["clip_ids"]), method, dtype=str)
     return data
 
 
 def _merge(parts: list[dict[str, np.ndarray]]) -> dict[str, np.ndarray]:
-    return {key: np.concatenate([part[key] for part in parts])
-            for key in ("states", "actions", "next_states", "clip_ids", "episode_ids")}
+    keys = ("states", "actions", "next_states", "clip_ids", "episode_ids",
+            "human_labels", "phases", "method_ids")
+    return {key: np.concatenate([part[key] for part in parts]) for key in keys}
 
 
 def _aggregate(folds: list[dict], keys: tuple[str, ...]) -> dict:
@@ -61,6 +83,8 @@ def main() -> int:
     parser.add_argument("--direct-transitions", required=True, type=Path)
     parser.add_argument("--confidence-transitions", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--episode-results-dir", required=True, type=Path,
+                        help="local contact-evaluation directory with per_clip outcome summaries")
     parser.add_argument("--epochs", type=int, default=220)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--transition-dt-seconds", type=float,
@@ -79,13 +103,18 @@ def main() -> int:
         parser.error("both transition archives must have the same observation interval")
     transition_dt = direct["dt_seconds"]
     data = _merge((direct, confidence))
+    outcomes = load_episode_outcomes(args.episode_results_dir)
+    expected_outcome_keys = set(zip(direct["clip_ids"], direct["method_ids"]))
+    expected_outcome_keys.update(zip(confidence["clip_ids"], confidence["method_ids"]))
+    validate_episode_outcomes(outcomes, expected_outcome_keys)
     unique_clips = np.unique(data["clip_ids"])
     if len(unique_clips) < 4:
         parser.error("four-fold evaluation requires at least four source clips")
-    folds = np.array_split(np.random.default_rng(args.seed).permutation(unique_clips), 4)
+    row_folds = assign_outer_folds(data["clip_ids"], fold_count=4, seed=args.seed)
     fold_results = []
-    for fold_index, test_clips in enumerate(folds):
-        test_mask = np.isin(data["clip_ids"], test_clips)
+    for fold_index in range(4):
+        test_mask = row_folds == fold_index
+        test_clips = np.unique(data["clip_ids"][test_mask])
         train_mask = ~test_mask
         checkpoint_path = output_dir / f"fold_{fold_index + 1}_state_dynamics.pt"
         if checkpoint_path.is_file():
