@@ -50,72 +50,76 @@ class ContactManipulationEnv(PandaEnv):
         pickup_xyz: tuple[float, float, float],
         dropoff_xyz: tuple[float, float, float],
         config: ContactTaskConfig | None = None,
+        model: mujoco.MjModel | None = None,
     ) -> None:
         self.config = config or ContactTaskConfig()
         self.pickup_xyz = self._validate_task_point("pickup_xyz", pickup_xyz)
         self.dropoff_xyz = self._validate_task_point("dropoff_xyz", dropoff_xyz)
         self._validate_task_geometry()
 
-        scene_path = Path(model_path).expanduser()
-        if not scene_path.is_file():
-            raise FileNotFoundError(f"MuJoCo scene file not found: {scene_path}")
-        spec = mujoco.MjSpec.from_file(str(scene_path))
-        world = spec.worldbody
-        world.add_geom(
-            name="contact_table_surface",
-            type=mujoco.mjtGeom.mjGEOM_BOX,
-            pos=self.config.table_center_xyz,
-            size=self.config.table_half_size_xyz,
-            rgba=(0.32, 0.22, 0.14, 1.0),
-            friction=(1.0, 0.01, 0.001),
-        )
-        tray_x, tray_y = self.dropoff_xyz[:2]
-        inner = self.config.tray_inner_half_size_xy
-        wall = self.config.tray_wall_thickness
-        floor_top = self.config.tray_floor_top_z
-        floor_half_z = self.config.tray_floor_thickness / 2.0
-        world.add_geom(
-            name="tray_floor",
-            type=mujoco.mjtGeom.mjGEOM_BOX,
-            pos=(tray_x, tray_y, self.config.table_surface_z + floor_half_z),
-            size=(inner + wall, inner + wall, floor_half_z),
-            rgba=(0.55, 0.36, 0.18, 1.0),
-            friction=(1.2, 0.02, 0.002),
-        )
-        wall_z = floor_top + self.config.tray_wall_height / 2.0
-        wall_height = self.config.tray_wall_height / 2.0
-        walls = (
-            ("front", (tray_x, tray_y - inner - wall, wall_z), (inner + wall, wall, wall_height)),
-            ("back", (tray_x, tray_y + inner + wall, wall_z), (inner + wall, wall, wall_height)),
-            ("left", (tray_x - inner - wall, tray_y, wall_z), (wall, inner, wall_height)),
-            ("right", (tray_x + inner + wall, tray_y, wall_z), (wall, inner, wall_height)),
-        )
-        for side, position, size in walls:
+        if model is None:
+            scene_path = Path(model_path).expanduser()
+            if not scene_path.is_file():
+                raise FileNotFoundError(f"MuJoCo scene file not found: {scene_path}")
+            spec = mujoco.MjSpec.from_file(str(scene_path))
+            world = spec.worldbody
             world.add_geom(
-                name=f"tray_wall_{side}",
+                name="contact_table_surface",
                 type=mujoco.mjtGeom.mjGEOM_BOX,
-                pos=position,
-                size=size,
-                rgba=(0.45, 0.29, 0.15, 1.0),
+                pos=self.config.table_center_xyz,
+                size=self.config.table_half_size_xyz,
+                rgba=(0.32, 0.22, 0.14, 1.0),
+                friction=(1.0, 0.01, 0.001),
+            )
+            tray_x, tray_y = self.dropoff_xyz[:2]
+            inner = self.config.tray_inner_half_size_xy
+            wall = self.config.tray_wall_thickness
+            floor_top = self.config.tray_floor_top_z
+            floor_half_z = self.config.tray_floor_thickness / 2.0
+            world.add_geom(
+                name="tray_floor",
+                type=mujoco.mjtGeom.mjGEOM_BOX,
+                pos=(tray_x, tray_y, self.config.table_surface_z + floor_half_z),
+                size=(inner + wall, inner + wall, floor_half_z),
+                rgba=(0.55, 0.36, 0.18, 1.0),
                 friction=(1.2, 0.02, 0.002),
             )
+            wall_z = floor_top + self.config.tray_wall_height / 2.0
+            wall_height = self.config.tray_wall_height / 2.0
+            walls = (
+                ("front", (tray_x, tray_y - inner - wall, wall_z), (inner + wall, wall, wall_height)),
+                ("back", (tray_x, tray_y + inner + wall, wall_z), (inner + wall, wall, wall_height)),
+                ("left", (tray_x - inner - wall, tray_y, wall_z), (wall, inner, wall_height)),
+                ("right", (tray_x + inner + wall, tray_y, wall_z), (wall, inner, wall_height)),
+            )
+            for side, position, size in walls:
+                world.add_geom(
+                    name=f"tray_wall_{side}",
+                    type=mujoco.mjtGeom.mjGEOM_BOX,
+                    pos=position,
+                    size=size,
+                    rgba=(0.45, 0.29, 0.15, 1.0),
+                    friction=(1.2, 0.02, 0.002),
+                )
 
-        package = world.add_body(
-            name="package", pos=self.pickup_xyz,
-            quat=(np.cos(self.config.package_yaw_radians / 2.0), 0.0, 0.0, np.sin(self.config.package_yaw_radians / 2.0)),
-        )
-        package.add_freejoint(name="package_free")
-        package.add_geom(
-            name="package_geom",
-            type=mujoco.mjtGeom.mjGEOM_BOX,
-            size=self.config.package_half_size_xyz,
-            mass=self.config.package_mass,
-            rgba=(0.16, 0.22, 0.32, 1.0),
-            friction=(self.config.package_friction, 0.02, 0.005),
-            condim=6,
-        )
+            package = world.add_body(
+                name="package", pos=self.pickup_xyz,
+                quat=(np.cos(self.config.package_yaw_radians / 2.0), 0.0, 0.0,
+                      np.sin(self.config.package_yaw_radians / 2.0)),
+            )
+            package.add_freejoint(name="package_free")
+            package.add_geom(
+                name="package_geom",
+                type=mujoco.mjtGeom.mjGEOM_BOX,
+                size=self.config.package_half_size_xyz,
+                mass=self.config.package_mass,
+                rgba=(0.16, 0.22, 0.32, 1.0),
+                friction=(self.config.package_friction, 0.02, 0.005),
+                condim=6,
+            )
+            model = spec.compile()
 
-        super().__init__(model=spec.compile())
+        super().__init__(model=model)
         # Match the stable home pose used by the existing physical Panda task.
         arm_seed = np.asarray((0.0, -0.5, 0.0, -1.7, 0.0, 2.0, 0.0), dtype=np.float64)
         for index in range(7):

@@ -96,6 +96,8 @@ def evaluate_contact_trajectory(
     release_open_fraction: float = 0.0,
     controller_pickup_xy: np.ndarray | None = None,
     controller_dropoff_xy: np.ndarray | None = None,
+    compiled_model: mujoco.MjModel | None = None,
+    initial_snapshot: mujoco.MjData | None = None,
     on_observation: Callable[[ContactManipulationEnv, dict | None], None] | None = None,
 ) -> dict:
     """Run one fresh simulation and return outcome plus state/action transitions."""
@@ -109,8 +111,18 @@ def evaluate_contact_trajectory(
         model_path=model,
         pickup_xyz=(float(pickup[0]), float(pickup[1]), 0.412),
         dropoff_xyz=(float(dropoff[0]), float(dropoff[1]), 0.416),
-        config=config,
+        config=config, model=compiled_model,
     )
+    if initial_snapshot is not None:
+        if (initial_snapshot.qpos.shape != env.data.qpos.shape
+                or initial_snapshot.qvel.shape != env.data.qvel.shape
+                or initial_snapshot.ctrl.shape != env.data.ctrl.shape):
+            raise ValueError("initial MjData snapshot does not match the compiled task model")
+        if not np.isfinite(initial_snapshot.time):
+            raise ValueError("initial MjData snapshot time must be finite")
+        # Copy the complete MjData into this run's private simulation. The source
+        # snapshot remains read-only while contacts and solver state advance.
+        mujoco.mj_copyData(env.data, env.model, initial_snapshot)
     observation_data = mujoco.MjData(env.model)
     initial_state = contact_task_state(env, observation_data=observation_data)
     transitions = []
