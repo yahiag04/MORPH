@@ -7,8 +7,11 @@ from pathlib import Path
 import numpy as np
 
 from evaluation.demo_video import (
-    PUBLIC_SHOWCASE_PATH, make_paired_video, render_panda_trajectory,
+    PUBLIC_SHOWCASE_PATH, make_paired_video, render_contact_panda_replay,
+    render_panda_trajectory,
 )
+from perception.retargeting import WorkspaceMapping
+from perception.task_layout import TaskLayout
 
 
 def _reject_output_input_aliases(output_paths: list[Path], inputs: list[Path]) -> None:
@@ -39,12 +42,34 @@ def read_trajectory(path: Path) -> np.ndarray:
     return points
 
 
+def read_timed_trajectory(path: Path) -> np.ndarray:
+    """Read timestamp and XYZ columns needed to replay the contact controller."""
+    with path.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    try:
+        points = np.asarray([[float(row[axis]) for axis in ("timestamp", "x", "y", "z")]
+                             for row in rows], dtype=np.float64)
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
+        raise ValueError(f"trajectory CSV must contain numeric timestamp, x, y, z columns: {path}") from error
+    if (points.ndim != 2 or len(points) < 2 or not np.isfinite(points).all()
+            or np.any(np.diff(points[:, 0]) <= 0)):
+        raise ValueError("trajectory CSV must contain at least two finite, time-ordered waypoints")
+    return points
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tracked_video", type=Path, help="Raw or annotated human demonstration video")
     parser.add_argument("trajectory_csv", type=Path, help="Retargeted XYZ CSV from the evaluator")
     parser.add_argument("--output-dir", required=True, type=Path, help="Local directory outside the repository")
     parser.add_argument("--model-path", type=Path, help="Optional Panda scene XML path")
+    parser.add_argument("--task-layout", type=Path,
+                        help="Local task_layout.json; enables the package-and-tray contact replay")
+    parser.add_argument("--human-label", default="riusciti",
+                        help="Local source label used by the contact replay (default: riusciti)")
+    parser.add_argument("--robot-bounds", nargs=4, type=float, default=(0.38, 0.68, -0.22, 0.22),
+                        metavar=("X_MIN", "X_MAX", "Y_MIN", "Y_MAX"),
+                        help="Workspace bounds used to map normalized task-layout coordinates")
     parser.add_argument("--public-showcase", action="store_true",
                         help="write the derived paired comparison to results/videos/human_to_panda.mp4")
     args = parser.parse_args()
@@ -54,6 +79,8 @@ def main() -> None:
         parser.error(f"tracked video not found: {tracked_video}")
     if not trajectory_csv.is_file():
         parser.error(f"trajectory CSV not found: {trajectory_csv}")
+    if args.public_showcase and args.task_layout is None:
+        parser.error("--public-showcase requires --task-layout for the contact-rich package replay")
     output_dir = args.output_dir.expanduser().resolve()
     repo_root = Path(__file__).resolve().parents[1]
     if output_dir == repo_root or repo_root in output_dir.parents:
@@ -65,12 +92,21 @@ def main() -> None:
     except ValueError as error:
         parser.error(str(error))
     output_dir.mkdir(parents=True, exist_ok=True)
-    points = read_trajectory(trajectory_csv)
-    robot_video = render_panda_trajectory(
-        points,
-        robot_output,
-        model_path=args.model_path,
-    )
+    if args.task_layout is None:
+        points = read_trajectory(trajectory_csv)
+        robot_video = render_panda_trajectory(points, robot_output, model_path=args.model_path)
+    else:
+        points = read_timed_trajectory(trajectory_csv)
+        layout = TaskLayout.load(args.task_layout.expanduser())
+        mapping = WorkspaceMapping(
+            robot_x_min=args.robot_bounds[0], robot_x_max=args.robot_bounds[1],
+            robot_y_min=args.robot_bounds[2], robot_y_max=args.robot_bounds[3],
+        )
+        pickup_xy, dropoff_xy = layout.to_robot_xy(mapping)
+        robot_video = render_contact_panda_replay(
+            points, pickup_xy, dropoff_xy, robot_output,
+            human_label=args.human_label, model_path=args.model_path,
+        )
     paired_video = make_paired_video(
         tracked_video,
         robot_video,

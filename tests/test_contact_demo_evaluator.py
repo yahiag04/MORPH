@@ -10,6 +10,7 @@ import numpy as np
 
 from evaluation.contact_demo_evaluator import (
     STATE_DIM, aggregate_contact_runs, contact_task_state, evaluate_contact_trajectory,
+    sample_contact_control_rate,
     write_transition_archive,
 )
 from perception.task_layout import TaskLayout
@@ -17,6 +18,17 @@ from simulation.contact_manipulation_env import ContactManipulationEnv
 
 
 class ContactDemoEvaluatorTests(unittest.TestCase):
+    def test_contact_control_rate_keeps_timed_endpoints(self):
+        trajectory = np.asarray([
+            [0.0, .5, .0, .62], [.04, .51, .0, .62],
+            [.10, .52, .0, .62], [.15, .53, .0, .62],
+        ])
+
+        sampled = sample_contact_control_rate(trajectory, 10.0)
+
+        np.testing.assert_allclose(sampled[:, 0], (0.0, 0.10, 0.15))
+        np.testing.assert_array_equal(sampled[-1], trajectory[-1])
+
     def test_observation_refreshes_derived_fields_without_changing_live_simulation(self):
         env = ContactManipulationEnv(pickup_xyz=(.55, .1, .412), dropoff_xyz=(.55, -.15, .416))
         env.data.ctrl[0] += .2
@@ -98,12 +110,18 @@ class ContactDemoEvaluatorTests(unittest.TestCase):
             [0.4, 0.65, 0.00, 0.62],
             [0.6, 0.65, -0.088, 0.62],
         ])
-        first = evaluate_contact_trajectory(trajectory, pickup, dropoff, human_label="riusciti")
+        observations = []
+        first = evaluate_contact_trajectory(
+            trajectory, pickup, dropoff, human_label="riusciti",
+            on_observation=lambda env, row: observations.append((float(env.data.time), row)),
+        )
         second = evaluate_contact_trajectory(trajectory, pickup, dropoff, human_label="riusciti")
         self.assertEqual(first["robot_success"], second["robot_success"])
         self.assertEqual(first["failure_reason"], second["failure_reason"])
         np.testing.assert_allclose(first["transitions"][0]["state"], second["transitions"][0]["state"])
         self.assertEqual(first["human_label"], "riusciti")
+        self.assertEqual(len(observations), len(first["transitions"]) + 1)
+        self.assertIsNone(observations[0][1])
         self.assertIn("robot_success", first)
         self.assertNotEqual(first["human_label"], first["robot_success"])
 

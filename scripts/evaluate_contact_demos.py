@@ -15,7 +15,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from evaluation.contact_demo_evaluator import aggregate_contact_runs, evaluate_contact_trajectory, write_transition_archive
+from evaluation.contact_demo_evaluator import (
+    aggregate_contact_runs, evaluate_contact_trajectory,
+    sample_contact_control_rate as _sample_control_rate,
+    write_transition_archive,
+)
 from perception.retargeting import WorkspaceMapping, map_hand_trajectory
 from perception.task_layout import TaskLayout, detect_task_layout
 from perception.workspace_calibration import WorkspaceCalibration
@@ -31,22 +35,6 @@ def _manifest_rows(path: Path) -> list[dict]:
     if not isinstance(data, list):
         raise ValueError("processing manifest must be a list")
     return data
-
-
-def _sample_control_rate(trajectory: np.ndarray, hz: float) -> np.ndarray:
-    interval = 1.0 / hz
-    indices = [0]
-    last_time = float(trajectory[0, 0])
-    for index in range(1, len(trajectory) - 1):
-        if trajectory[index, 0] - last_time >= interval:
-            indices.append(index)
-            last_time = float(trajectory[index, 0])
-    if len(trajectory) > 1 and indices[-1] != len(trajectory) - 1:
-        indices.append(len(trajectory) - 1)
-    sampled = trajectory[np.asarray(indices)]
-    if len(sampled) > 1 and np.any(np.diff(sampled[:, 0]) <= 0):
-        raise ValueError("downsampled trajectory timestamps are not strictly increasing")
-    return sampled
 
 
 def _plot(aggregates: dict[str, dict], destination: Path) -> None:

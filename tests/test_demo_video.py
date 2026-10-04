@@ -39,6 +39,19 @@ def read_frames(path: Path):
 
 
 class DemoVideoTests(unittest.TestCase):
+    def test_pairing_aligns_by_video_duration_when_source_frame_rates_differ(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            real = root / "real.mp4"
+            robot = root / "robot.mp4"
+            output = root / "paired.mp4"
+            write_color_video(real, [(20, 20, 20)] * 3, fps=10.0)
+            write_color_video(robot, [(80, 80, 80)] * 4, fps=20.0)
+
+            result = make_paired_video(real, robot, output, fps=10.0)
+
+            self.assertEqual(len(read_frames(result)), 3)
+
     def test_public_showcase_output_requires_opt_in_and_is_narrowly_scoped(self):
         with tempfile.TemporaryDirectory() as directory:
             root = (Path(directory) / "repo").resolve()

@@ -105,11 +105,79 @@ def render_panda_trajectory(
     return destination
 
 
+def render_contact_panda_replay(
+    trajectory: np.ndarray,
+    pickup_xy: np.ndarray,
+    dropoff_xy: np.ndarray,
+    output_path: str | Path,
+    *,
+    human_label: str = "riusciti",
+    model_path: str | Path | None = None,
+    control_hz: float = 10.0,
+) -> Path:
+    """Render the same contact-rich Panda task used by the episode evaluator."""
+    from evaluation.contact_demo_evaluator import (
+        evaluate_contact_trajectory, sample_contact_control_rate,
+    )
+
+    points = np.asarray(trajectory, dtype=np.float64)
+    if points.ndim != 2 or points.shape[1] != 4 or len(points) < 2:
+        raise ValueError("trajectory must have at least two timestamped XYZ waypoints")
+    destination = _local_output_path(output_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    control_path = sample_contact_control_rate(points, control_hz)
+    writer = cv2.VideoWriter(
+        str(destination), cv2.VideoWriter_fourcc(*"mp4v"), 50.0,
+        (ROBOT_WIDTH, ROBOT_HEIGHT),
+    )
+    if not writer.isOpened():
+        raise OSError(f"Could not create contact Panda replay video: {destination}")
+    renderer = None
+    camera = None
+    frame_count = 0
+
+    def capture(env, _observation) -> None:
+        nonlocal renderer, camera, frame_count
+        if renderer is None:
+            renderer = mujoco.Renderer(env.model, height=ROBOT_HEIGHT, width=ROBOT_WIDTH)
+            camera = mujoco.MjvCamera()
+            mujoco.mjv_defaultCamera(camera)
+            camera.lookat[:] = (0.55, 0.0, 0.43)
+            camera.distance = 1.25
+            camera.azimuth = 90.0
+            camera.elevation = -55.0
+        renderer.update_scene(env.data, camera=camera)
+        writer.write(cv2.cvtColor(renderer.render(), cv2.COLOR_RGB2BGR))
+        frame_count += 1
+
+    try:
+        evaluate_contact_trajectory(
+            control_path, pickup_xy, dropoff_xy, human_label=human_label,
+            model_path=model_path, simulation_steps_per_sample=50,
+            observation_steps=10, on_observation=capture,
+        )
+    finally:
+        writer.release()
+        if renderer is not None:
+            renderer.close()
+    if frame_count < 2:
+        destination.unlink(missing_ok=True)
+        raise ValueError("contact replay produced fewer than two frames")
+    return destination
+
+
 def _video_frame_count(capture: cv2.VideoCapture, path: Path) -> int:
     count = int(round(capture.get(cv2.CAP_PROP_FRAME_COUNT)))
     if count < 1:
         raise ValueError(f"video contains no readable frames: {path}")
     return count
+
+
+def _video_frame_rate(capture: cv2.VideoCapture, path: Path) -> float:
+    rate = float(capture.get(cv2.CAP_PROP_FPS))
+    if not np.isfinite(rate) or rate <= 0:
+        raise ValueError(f"video has an invalid frame rate: {path}")
+    return rate
 
 
 def _read_to_index(
@@ -185,7 +253,10 @@ def make_paired_video(
         raise ValueError("could not open both input videos")
     real_count = _video_frame_count(real_capture, real)
     robot_count = _video_frame_count(robot_capture, robot)
-    total_frames = max(real_count, robot_count)
+    real_rate = _video_frame_rate(real_capture, real)
+    robot_rate = _video_frame_rate(robot_capture, robot)
+    common_duration = max(real_count / real_rate, robot_count / robot_rate)
+    total_frames = max(2, int(np.ceil(common_duration * fps)))
     output.parent.mkdir(parents=True, exist_ok=True)
     writer = cv2.VideoWriter(
         str(output), cv2.VideoWriter_fourcc(*"mp4v"), float(fps), (OUTPUT_WIDTH, OUTPUT_HEIGHT)

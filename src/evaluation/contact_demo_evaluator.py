@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from copy import copy
+from collections.abc import Callable
 from pathlib import Path
 
 import mujoco
@@ -17,6 +18,28 @@ from simulation.panda_env import DEFAULT_MODEL_PATH
 
 STATE_DIM = 37
 ACTION_DIM = 4
+
+
+def sample_contact_control_rate(trajectory: np.ndarray, hz: float) -> np.ndarray:
+    """Match a timestamped hand path to the task controller's command rate."""
+    points = np.asarray(trajectory, dtype=np.float64)
+    if points.ndim != 2 or points.shape[1] != 4 or len(points) < 1:
+        raise ValueError("trajectory must have columns timestamp,x,y,z")
+    if not np.isfinite(points).all() or not np.isfinite(hz) or hz <= 0:
+        raise ValueError("trajectory and control frequency must be finite; frequency must be positive")
+    interval = 1.0 / hz
+    indices = [0]
+    last_time = float(points[0, 0])
+    for index in range(1, len(points) - 1):
+        if points[index, 0] - last_time >= interval:
+            indices.append(index)
+            last_time = float(points[index, 0])
+    if len(points) > 1 and indices[-1] != len(points) - 1:
+        indices.append(len(points) - 1)
+    sampled = points[np.asarray(indices)]
+    if len(sampled) > 1 and np.any(np.diff(sampled[:, 0]) <= 0):
+        raise ValueError("downsampled trajectory timestamps are not strictly increasing")
+    return sampled
 
 
 def contact_task_state(env: ContactManipulationEnv, *, observation_data: mujoco.MjData | None = None) -> np.ndarray:
@@ -73,6 +96,7 @@ def evaluate_contact_trajectory(
     release_open_fraction: float = 0.0,
     controller_pickup_xy: np.ndarray | None = None,
     controller_dropoff_xy: np.ndarray | None = None,
+    on_observation: Callable[[ContactManipulationEnv, dict | None], None] | None = None,
 ) -> dict:
     """Run one fresh simulation and return outcome plus state/action transitions."""
     trajectory = np.asarray(trajectory_xyz, dtype=np.float64)
@@ -91,6 +115,8 @@ def evaluate_contact_trajectory(
     initial_state = contact_task_state(env, observation_data=observation_data)
     transitions = []
     previous = initial_state
+    if on_observation is not None:
+        on_observation(env, None)
 
     def record(row: dict) -> None:
         nonlocal previous
@@ -108,6 +134,8 @@ def evaluate_contact_trajectory(
             "phase": row["phase"],
         })
         previous = state.copy()
+        if on_observation is not None:
+            on_observation(env, row)
 
     result = run_demonstration_manipulation(
         env, trajectory,
