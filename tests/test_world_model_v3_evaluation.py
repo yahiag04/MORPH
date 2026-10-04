@@ -111,6 +111,23 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(report["horizons"]["5"]["window_count"], 2)
         self.assertIsNone(report["horizons"]["20"]["groups"]["package_position"]["model_rmse"])
 
+    def test_event_window_evaluation_centers_on_contact_changes(self):
+        from world_model.v3.evaluation import _episode_rows, _evaluation_windows, evaluate_dynamics
+
+        batch = make_episode(steps=12)
+        selected = _evaluation_windows(batch, _episode_rows(batch), 5, "events")
+        self.assertEqual(len(selected), 2)
+        for _, _, rows in selected:
+            changed = np.flatnonzero(np.any(
+                batch.states[rows][:, 32:34] != batch.next_states[rows][:, 32:34], axis=1,
+            ))
+            self.assertGreater(len(changed), 0)
+        report = evaluate_dynamics(
+            PerfectActionModel(), batch, horizons=(5,), window_selection="events",
+        )
+        self.assertEqual(report["window_selection"], "events")
+        self.assertEqual(report["horizons"]["5"]["window_count"], 2)
+
     def test_quaternion_error_treats_q_and_negative_q_as_same_orientation(self):
         from world_model.v3.evaluation import quaternion_angular_error
 

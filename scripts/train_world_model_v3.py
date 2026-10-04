@@ -35,7 +35,8 @@ def _select_families(batch: EpisodeBatch, count: int) -> EpisodeBatch:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset-dir", required=True, type=Path)
+    parser.add_argument("--dataset-dir", required=True, type=Path, action="append",
+                        help="dataset root with episodes/; may be repeated for compatible partitions")
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--seed", type=int)
@@ -62,14 +63,22 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             train, validation = _select_families(train, 4), _select_families(validation, 2)
             config["epochs"] = 2
+            config["rollout_horizon"] = 25
+            config["horizon_schedule"] = None
         if args.pilot:
             config["epochs"] = 5
+            config["rollout_horizon"] = 25
+            config["horizon_schedule"] = None
         if args.seed is not None:
             config["seed"] = args.seed
         if args.max_epochs is not None:
             if args.max_epochs < 1:
                 raise ValueError("--max-epochs must be positive")
             config["epochs"] = args.max_epochs
+            schedule = config.get("horizon_schedule")
+            if schedule and sum(stage.get("epochs", 0) for stage in schedule) != args.max_epochs:
+                config["rollout_horizon"] = 25
+                config["horizon_schedule"] = None
         model = fit_dynamics(
             train, validation, config=config, output_dir=destination, resume=args.resume,
         )
@@ -78,6 +87,12 @@ def main(argv: list[str] | None = None) -> int:
         (destination / "validation.json").write_text(
             json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8",
         )
+        event_report = evaluate_dynamics(
+            model, validation, horizons=horizons, window_selection="events",
+        )
+        (destination / "validation_events.json").write_text(
+            json.dumps(event_report, indent=2, allow_nan=False) + "\n", encoding="utf-8",
+        )
     except (OSError, json.JSONDecodeError, ValueError, ImportError, RuntimeError) as error:
         parser.error(str(error))
     print(json.dumps({
@@ -85,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         "training_families": len(model.training_group_ids),
         "validation_families": len(np.unique(validation.group_ids)),
         "output_dir": str(destination), "validation_file": "validation.json",
+        "event_validation_file": "validation_events.json",
     }, sort_keys=True))
     return 0
 

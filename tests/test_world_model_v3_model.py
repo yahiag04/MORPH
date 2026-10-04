@@ -3,6 +3,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
@@ -82,6 +83,31 @@ class DynamicsV3ModelTests(unittest.TestCase):
             self.assertEqual(loaded.config.action_mode, "actuator8")
             with self.assertRaisesRegex(ValueError, "action_mode"):
                 type(self.model).load(checkpoint, expected={"action_mode": "cartesian4"})
+
+    def test_relative_features_follow_predicted_states_during_rollout(self):
+        from world_model.v3.contracts import DynamicsConfig
+        from world_model.v3.model import DynamicsNormalizerV3, DynamicsV3
+
+        model = DynamicsV3(
+            DynamicsConfig("actuator8", relative_features=True, ensemble_size=1, hidden_dim=8),
+            seed=7, normalizer=DynamicsNormalizerV3(
+                np.zeros(43), np.ones(43), np.zeros(8), np.ones(8),
+                np.zeros(32), np.ones(32),
+            ),
+        )
+        initial = np.zeros((1, 37), dtype=np.float32)
+        initial[:, 20] = 1.0
+        initial[:, 17:20] = (0.3, 0.1, 0.5)
+        initial[:, 34:37] = (0.5, -0.1, 0.4)
+        actions = np.zeros((1, 2, 8), dtype=np.float32)
+        with patch.object(model, "input_features", wraps=model.input_features) as read_features:
+            rollout = model.rollout(initial, actions)
+        predicted = rollout.states[0, 0, 1]
+        second_input_state = read_features.call_args_list[1].args[0]
+        np.testing.assert_array_equal(second_input_state[0], predicted)
+        second_features = model.input_features(second_input_state)
+        np.testing.assert_allclose(second_features[0, 37:40], predicted[17:20] - predicted[0:3])
+        np.testing.assert_allclose(second_features[0, 40:43], predicted[34:37] - predicted[17:20])
 
 
 if __name__ == "__main__":

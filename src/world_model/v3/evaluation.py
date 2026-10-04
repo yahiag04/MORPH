@@ -258,12 +258,34 @@ def _mean_member_state(states: np.ndarray, contact_probs: np.ndarray,
     return output.astype(np.float32)
 
 
-def _window_batches(batch: EpisodeBatch, episodes, horizon: int, chunk_size: int = 128):
+def _evaluation_windows(batch: EpisodeBatch, episodes, horizon: int, window_selection: str):
+    if window_selection not in ("uniform", "events"):
+        raise ValueError("window_selection must be uniform or events")
     windows = []
     for episode, group, rows in episodes:
-        for start in range(0, len(rows) - horizon + 1, horizon):
+        latest_start = len(rows) - horizon
+        if latest_start < 0:
+            continue
+        if window_selection == "uniform":
+            starts = range(0, latest_start + 1, horizon)
+        else:
+            event_rows = np.flatnonzero(np.any(
+                batch.states[rows][:, list(CONTACT_INDICES)]
+                != batch.next_states[rows][:, list(CONTACT_INDICES)], axis=1,
+            ))
+            starts = sorted({min(max(0, int(event) - 5), latest_start)
+                             for event in event_rows})
+        for start in starts:
             indices = rows[start:start + horizon]
             windows.append((episode, group, indices))
+    return windows
+
+
+def _window_batches(
+    batch: EpisodeBatch, episodes, horizon: int, chunk_size: int = 128,
+    window_selection: str = "uniform",
+):
+    windows = _evaluation_windows(batch, episodes, horizon, window_selection)
     for offset in range(0, len(windows), chunk_size):
         chunk = windows[offset:offset + chunk_size]
         initials = np.stack([batch.states[item[2][0]] for item in chunk])
@@ -302,6 +324,7 @@ def evaluate_dynamics(
     episodes: EpisodeBatch,
     *,
     horizons: tuple[int, ...],
+    window_selection: str = "uniform",
 ) -> dict[str, Any]:
     """Score open-loop trajectories against baselines on complete episodes."""
     if not horizons or any(not isinstance(value, (int, np.integer)) or value < 1
@@ -309,6 +332,8 @@ def evaluate_dynamics(
         raise ValueError("horizons must contain positive integer observation steps")
     if len(set(horizons)) != len(horizons):
         raise ValueError("horizons must not contain duplicates")
+    if window_selection not in ("uniform", "events"):
+        raise ValueError("window_selection must be uniform or events")
     episode_index = _episode_rows(episodes)
     training_groups = getattr(model, "training_group_ids", None)
     if training_groups is None:
@@ -319,8 +344,10 @@ def evaluate_dynamics(
     dt = float(episodes.metadata.get("observation_dt", np.median(
         episodes.end_times - episodes.start_times
     )))
-    result: dict[str, Any] = {"horizons": {}, "episode_count": len(episode_index)}
+    result: dict[str, Any] = {"horizons": {}, "episode_count": len(episode_index),
+                              "window_selection": window_selection}
     for horizon in horizons:
+        selected_windows = _evaluation_windows(episodes, episode_index, horizon, window_selection)
         errors: dict[str, dict[str, list[np.ndarray]]] = {
             model_name: {name: [] for name in STATE_GROUPS}
             for model_name in ("model", "persistence", "constant_velocity", "zero_velocity")
@@ -345,12 +372,13 @@ def evaluate_dynamics(
         contact_probabilities: list[np.ndarray] = []
         contact_truth: list[np.ndarray] = []
         family_windows: Counter[str] = Counter()
-        expected_windows = sum(max(0, (len(rows) - horizon) // horizon + 1)
-                               for _, _, rows in episode_index)
+        expected_windows = len(selected_windows)
         valid_windows = 0
         member_slots = 0
         valid_members = 0
-        for chunk, initial, actions in _window_batches(episodes, episode_index, horizon):
+        for chunk, initial, actions in _window_batches(
+            episodes, episode_index, horizon, window_selection=window_selection,
+        ):
             if not len(chunk):
                 continue
             rollout = model.rollout(initial, actions)
@@ -490,6 +518,7 @@ def evaluate_dynamics(
             "family_count": len(family_windows),
             "endpoint_contacts": endpoint_contact,
             "windows_by_family": dict(sorted(family_windows.items())),
+            "window_selection": window_selection,
         }
 
     one_step_valid: dict[str, np.ndarray] = {

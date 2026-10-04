@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -104,14 +105,16 @@ def _action_array(arrays: dict[str, np.ndarray], action_mode: str) -> np.ndarray
 
 
 def load_partitions(
-    dataset_dir: Path, *, action_mode: str
+    dataset_dir: Path | list[Path] | tuple[Path, ...], *, action_mode: str
 ) -> dict[str, EpisodeBatch]:
-    """Load synthetic episodes while enforcing episode and family integrity."""
+    """Load one or more synthetic datasets, preserving family partitions."""
     action_dim = _require_action_mode(action_mode)
-    root = Path(dataset_dir).expanduser().resolve()
-    episode_paths = sorted((root / "episodes").glob("*.npz"))
-    if not episode_paths:
-        raise ValueError(f"no episode archives found under {root / 'episodes'}")
+    candidates = [dataset_dir] if isinstance(dataset_dir, (str, Path)) else list(dataset_dir)
+    if not candidates:
+        raise ValueError("at least one dataset directory is required")
+    roots = [Path(candidate).expanduser().resolve() for candidate in candidates]
+    if len(set(roots)) != len(roots):
+        raise ValueError("dataset directories must be unique")
 
     collected: dict[str, dict[str, list[np.ndarray]]] = {
         split: {name: [] for name in (
@@ -121,60 +124,77 @@ def load_partitions(
         for split in ("train", "validation", "test")
     }
     family_partitions: dict[str, str] = {}
+    family_roots: dict[str, Path] = {}
     seen_episodes: set[str] = set()
     intervals: set[float] = set()
     source_kinds: set[str] = set()
+    dataset_sources = []
 
-    for path in episode_paths:
-        arrays = _read_archive(path, required=SYNTHETIC_ARRAYS)
-        states = arrays["states"].astype(np.float32, copy=False)
-        next_states = arrays["next_states"].astype(np.float32, copy=False)
-        actions = _action_array(arrays, action_mode)
-        episodes = arrays["episode_ids"].astype(str)
-        groups = arrays["group_ids"].astype(str)
-        splits = arrays["splits"].astype(str)
-        sources = arrays["source_kinds"].astype(str)
-        phases = arrays["phases"].astype(str)
-        starts = arrays["simulation_start_times"].astype(np.float64, copy=False)
-        ends = arrays["simulation_end_times"].astype(np.float64, copy=False)
-        intervals_row = arrays["transition_dt_seconds"].astype(np.float64, copy=False)
-        count = len(states)
-        if intervals_row.shape != (count,) or not np.isfinite(intervals_row).all() or np.any(intervals_row <= 0):
-            raise ValueError(f"{path.name} transition intervals must be positive finite values")
-        if not np.allclose(ends - starts, intervals_row, rtol=0.0, atol=1e-8):
-            raise ValueError(f"{path.name} transition duration disagrees with simulation times")
-        if not np.allclose(intervals_row, intervals_row[0], rtol=0.0, atol=1e-8):
-            raise ValueError(f"{path.name} does not use a uniform observation interval")
-        for name, values in (("phases", phases), ("splits", splits), ("source_kinds", sources)):
-            if values.shape != (count,):
-                raise ValueError(f"{path.name} {name} must have one value per transition")
-        if len(np.unique(splits)) != 1 or splits[0] not in collected:
-            raise ValueError(f"{path.name} must declare exactly one supported partition")
-        if len(np.unique(sources)) != 1 or sources[0] != "simulation_randomized":
-            raise ValueError(f"{path.name} is not a randomized simulation episode")
-        _check_transition_arrays(states, actions, next_states, starts, ends,
-                                 expected_action_dim=action_dim, episode_ids=episodes,
-                                 group_ids=groups)
-        episode, family, split = str(episodes[0]), str(groups[0]), str(splits[0])
-        if path.stem != episode:
-            raise ValueError(f"{path.name} does not match its episode provenance")
-        if episode in seen_episodes:
-            raise ValueError(f"duplicate episode ID {episode!r}")
-        seen_episodes.add(episode)
-        previous = family_partitions.setdefault(family, split)
-        if previous != split:
-            raise ValueError(f"scenario family {family!r} crosses data partitions")
-        intervals.add(round(float(intervals_row[0]), 12))
-        source_kinds.add(str(sources[0]))
-        target = collected[split]
-        target["states"].append(states)
-        target["actions"].append(actions)
-        target["next_states"].append(next_states)
-        target["episode_ids"].append(episodes)
-        target["group_ids"].append(groups)
-        target["phases"].append(phases)
-        target["start_times"].append(starts)
-        target["end_times"].append(ends)
+    for root in roots:
+        episode_paths = sorted((root / "episodes").glob("*.npz"))
+        if not episode_paths:
+            raise ValueError(f"no episode archives found under {root / 'episodes'}")
+        dataset_digest = hashlib.sha256()
+        for path in episode_paths:
+            dataset_digest.update(path.name.encode("utf-8"))
+            with path.open("rb") as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b""):
+                    dataset_digest.update(block)
+        dataset_sources.append({"path": str(root), "sha256": dataset_digest.hexdigest(),
+                                "episode_count": len(episode_paths)})
+        for path in episode_paths:
+            arrays = _read_archive(path, required=SYNTHETIC_ARRAYS)
+            states = arrays["states"].astype(np.float32, copy=False)
+            next_states = arrays["next_states"].astype(np.float32, copy=False)
+            actions = _action_array(arrays, action_mode)
+            episodes = arrays["episode_ids"].astype(str)
+            groups = arrays["group_ids"].astype(str)
+            splits = arrays["splits"].astype(str)
+            sources = arrays["source_kinds"].astype(str)
+            phases = arrays["phases"].astype(str)
+            starts = arrays["simulation_start_times"].astype(np.float64, copy=False)
+            ends = arrays["simulation_end_times"].astype(np.float64, copy=False)
+            intervals_row = arrays["transition_dt_seconds"].astype(np.float64, copy=False)
+            count = len(states)
+            if intervals_row.shape != (count,) or not np.isfinite(intervals_row).all() or np.any(intervals_row <= 0):
+                raise ValueError(f"{path.name} transition intervals must be positive finite values")
+            if not np.allclose(ends - starts, intervals_row, rtol=0.0, atol=1e-8):
+                raise ValueError(f"{path.name} transition duration disagrees with simulation times")
+            if not np.allclose(intervals_row, intervals_row[0], rtol=0.0, atol=1e-8):
+                raise ValueError(f"{path.name} does not use a uniform observation interval")
+            for name, values in (("phases", phases), ("splits", splits), ("source_kinds", sources)):
+                if values.shape != (count,):
+                    raise ValueError(f"{path.name} {name} must have one value per transition")
+            if len(np.unique(splits)) != 1 or splits[0] not in collected:
+                raise ValueError(f"{path.name} must declare exactly one supported partition")
+            if len(np.unique(sources)) != 1 or sources[0] != "simulation_randomized":
+                raise ValueError(f"{path.name} is not a randomized simulation episode")
+            _check_transition_arrays(states, actions, next_states, starts, ends,
+                                     expected_action_dim=action_dim, episode_ids=episodes,
+                                     group_ids=groups)
+            episode, family, split = str(episodes[0]), str(groups[0]), str(splits[0])
+            if path.stem != episode:
+                raise ValueError(f"{path.name} does not match its episode provenance")
+            if episode in seen_episodes:
+                raise ValueError(f"duplicate episode ID {episode!r}")
+            seen_episodes.add(episode)
+            previous = family_partitions.setdefault(family, split)
+            previous_root = family_roots.setdefault(family, root)
+            if previous_root != root:
+                raise ValueError(f"duplicate family namespace {family!r} appears in multiple datasets")
+            if previous != split:
+                raise ValueError(f"scenario family {family!r} crosses data partitions")
+            intervals.add(round(float(intervals_row[0]), 12))
+            source_kinds.add(str(sources[0]))
+            target = collected[split]
+            target["states"].append(states)
+            target["actions"].append(actions)
+            target["next_states"].append(next_states)
+            target["episode_ids"].append(episodes)
+            target["group_ids"].append(groups)
+            target["phases"].append(phases)
+            target["start_times"].append(starts)
+            target["end_times"].append(ends)
 
     if len(intervals) != 1:
         raise ValueError("all synthetic partitions must use the same observation interval")
@@ -196,7 +216,7 @@ def load_partitions(
             end_times=np.concatenate(rows["end_times"]).astype(np.float64, copy=False),
             metadata={"source_kind": "simulation_randomized", "partition": split,
                       "action_mode": action_mode, "action_dim": action_dim,
-                      "observation_dt": dt},
+                      "observation_dt": dt, "dataset_sources": dataset_sources},
         )
     return output
 

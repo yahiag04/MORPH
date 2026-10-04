@@ -70,6 +70,32 @@ class WorldModelV3DataTests(unittest.TestCase):
             np.testing.assert_array_equal(actuator["train"].episode_ids, expected["episode_ids"])
             self.assertEqual(actuator["train"].actions.shape, (8, 8))
 
+    def test_loads_multiple_development_datasets_and_rejects_family_namespace_collision(self):
+        from world_model.v3.data import load_partitions
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            first, second = root / "existing", root / "counterfactual"
+            write_synthetic_episode(first, episode="old-train", family="old-family",
+                                    split="train", source="simulation_randomized")
+            write_synthetic_episode(first, episode="old-val", family="old-val-family",
+                                    split="validation", source="simulation_randomized")
+            write_synthetic_episode(second, episode="new-train", family="new-family",
+                                    split="train", source="simulation_randomized")
+            write_synthetic_episode(second, episode="new-val", family="new-val-family",
+                                    split="validation", source="simulation_randomized")
+
+            partitions = load_partitions([first, second], action_mode="actuator8")
+            self.assertEqual(len(partitions["train"].states), 16)
+            self.assertEqual(set(partitions["train"].group_ids), {"old-family", "new-family"})
+            self.assertEqual(len(partitions["validation"].states), 16)
+            self.assertEqual(len(partitions["train"].metadata["dataset_sources"]), 2)
+
+            write_synthetic_episode(second, episode="duplicate-train", family="old-family",
+                                    split="train", source="simulation_randomized")
+            with self.assertRaisesRegex(ValueError, "family.*namespace|duplicate.*family"):
+                load_partitions([first, second], action_mode="actuator8")
+
     def test_rejects_missing_actuator_controls_without_falling_back_to_cartesian(self):
         from world_model.v3.data import load_partitions
 

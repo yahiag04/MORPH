@@ -1,0 +1,36 @@
+{
+  "action_mode": "actuator8",
+  "relative_features": true,
+  "event_fraction": 0.5,
+  "balance_contacts": true,
+  "loss_mode": "grouped_state",
+  "state_loss_weights": {
+    "end_effector_position": 1.0,
+    "arm_position": 1.0,
+    "arm_velocity": 0.5,
+    "package_position": 3.0,
+    "package_orientation": 1.0,
+    "package_linear_velocity": 1.0,
+    "package_angular_velocity": 1.0,
+    "gripper_aperture": 1.0,
+    "gripper_velocity": 0.5
+  },
+  "ensemble_size": 3,
+  "hidden_dim": 128,
+  "seed": 17,
+  "epochs": 40,
+  "batch_size": 64,
+  "learning_rate": 0.0005,
+  "weight_decay": 0.00001,
+  "gradient_clip": 1.0,
+  "patience": 8,
+  "rollout_horizon": 25,
+  "horizon_schedule": [
+    {"horizon": 25, "epochs": 15},
+    {"horizon": 50, "epochs": 15},
+    {"horizon": 100, "epochs": 10}
+  ],
+  "window_stride": 5,
+  "observation_dt": 0.02,
+  "device": "cpu"
+}
