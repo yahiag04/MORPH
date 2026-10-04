@@ -334,14 +334,16 @@ Per la diagnostica storica dei video definire inoltre `load_human_replays(result
 **Creare:** `v3/evaluation.py`, `scripts/evaluate_world_model_v3.py`, `tests/test_world_model_v3_evaluation.py`.
 **Interfacce:** `evaluate_dynamics(model, episodes: EpisodeBatch, *, horizons: tuple[int, ...]) -> dict`; `evaluate_candidates(predictions: list[dict], outcomes: list[dict]) -> dict`; `bootstrap_families(rows: list[dict], *, seed: int = 20261004, samples: int = 2000) -> dict`.
 
-- [ ] Scrivere test in cui un modello perfetto ha errore zero, un modello costante fallisce quando l'oggetto si muove, `q` e `-q` hanno errore zero, un contatto sempre attivo non ottiene buon F1 sugli eventi, e due eventi predetti non possono abbinarsi alla stessa transizione vera.
-- [ ] Aggiungere casi selezione con pareggi, esiti tutti uguali, scene senza successi e candidati mancanti. Le coppie tra scene diverse non devono entrare nel ranking entro scena.
-- [ ] Implementare P0/P1: persistenza; `p(t+h)=p(t)+v(t)*h*dt` per posizione; velocità zero come confronto separato. Le baseline non leggono stati futuri per produrre predizioni.
-- [ ] Implementare endpoint a 5/25/50/100 passi, errore lungo la traiettoria e metriche per fase/evento. Riportare numero di finestre e famiglie per ogni metrica.
-- [ ] Per le finestre evento, calcolare anche le stesse metriche su un campionamento uniforme: l'oversampling serve al training, non a gonfiare la metrica pubblica.
-- [ ] Implementare gli intervalli bootstrap per famiglia e verifica della mancata sovrapposizione con train/validation del checkpoint. La modalità finale richiede un manifest di test congelato.
-- [ ] Eseguire `PYTHONPATH=src "$MORPH_TRAIN_PY" -m unittest discover -s tests -p 'test_world_model_v3_evaluation.py' -v` e salvare i risultati delle baseline sui soli dati di sviluppo.
-- [ ] Commit: `feat: evaluate contact events and scenario decisions`.
+- [x] Scrivere test in cui un modello perfetto ha errore zero, un modello costante fallisce quando l'oggetto si muove, `q` e `-q` hanno errore zero, un contatto sempre attivo non ottiene buon F1 sugli eventi, e due eventi predetti non possono abbinarsi alla stessa transizione vera.
+- [x] Aggiungere casi selezione con pareggi, esiti tutti uguali, scene senza successi e candidati mancanti. Le coppie tra scene diverse non devono entrare nel ranking entro scena.
+- [x] Implementare P0/P1: persistenza; `p(t+h)=p(t)+v(t)*h*dt` per posizione; velocità zero come confronto separato. Le baseline non leggono stati futuri per produrre predizioni.
+- [x] Implementare endpoint a 5/25/50/100 passi, errore lungo la traiettoria e metriche per fase/evento. Riportare numero di finestre e famiglie per ogni metrica.
+- [x] Per le finestre evento, calcolare anche le stesse metriche su un campionamento uniforme: l'oversampling serve al training, non a gonfiare la metrica pubblica. Le metriche dinamiche usano finestre uniformi non sovrapposte; gli eventi sono contati su tutta la timeline uniforme.
+- [x] Implementare gli intervalli bootstrap per famiglia e verifica della mancata sovrapposizione con train/validation del checkpoint. La modalità finale richiede un manifest di test congelato.
+- [x] Eseguire `PYTHONPATH=src "$MORPH_TRAIN_PY" -m unittest discover -s tests -p 'test_world_model_v3_evaluation.py' -v` e salvare i risultati delle baseline sui soli dati di sviluppo.
+- [x] Commit: `feat: evaluate contact events and scenario decisions`.
+
+**Evidenza:** 14 test V3 per il valutatore; suite completa 163 test OK, 13 skip per PyTorch opzionale nell'ambiente simulator. CLI `--help`, compilazione e `git diff --check` passano. Baseline salvate fuori Git in `MORPH-local-data/world-model-v3/baseline-development-20261004.json`: 204 episodi e 51 famiglie train+validation; il test è escluso. Sul relativo split, a 0,5 s, la baseline persistenza ha RMSE posizione oggetto di 0,01032 m; CV 0,01310 m; F1 eventi pinza/supporto per tutte le baseline semplici è 0,0. Questi numeri sono riferimento di sviluppo, non prova di miglioramento del modello.
 
 **Completamento:** il valutatore distingue una buona metrica media da un modello che non predice i contatti decisivi. In questa fase un modello sintetico deterministico basta per validare le metriche.
 
