@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "status": "development_validation_only",
+  "protocol": {
+    "dataset": "combined randomized MuJoCo development data",
+    "action_mode": "actuator8",
+    "seed": 17,
+    "training_family_count": 122,
+    "validation_family_count": 29,
+    "validation_episode_count": 196,
+    "bootstrap": {
+      "unit": "scenario family",
+      "samples": 2000,
+      "seed": 20261004,
+      "confidence_level": 0.95
+    },
+    "test_partition_used": false,
+    "multi_seed_confirmation": false,
+    "control_evaluation": false
+  },
+  "metric_definition": {
+    "package_position_rmse_mm": "Trajectory RMSE across rollout steps, converted from metres to millimetres.",
+    "uniform_windows": "All eligible validation windows sampled uniformly.",
+    "event_centered_windows": "Validation windows centered on observed contact-transition events.",
+    "contact_transition_f1": "One-step contact-transition F1 with one-to-one event matching and ±2 observation tolerance (40 ms)."
+  },
+  "models": [
+    {
+      "id": "M1-expanded",
+      "config": "configs/world_model_v3/m1-expanded.json",
+      "epochs_per_member": [26, 27, 40],
+      "best_validation_loss_per_member": [0.0991545635, 0.0988109469, 0.0941942070],
+      "package_position_rmse_mm": {
+        "uniform_windows": {
+          "0.5s": {"mean": 4.20, "ci95": [3.87, 4.59]},
+          "2.0s": {"mean": 13.15, "ci95": [11.79, 14.30]}
+        },
+        "event_centered_windows": {
+          "0.5s": {"mean": 13.69, "ci95": [12.12, 15.87]},
+          "2.0s": {"mean": 14.10, "ci95": [12.99, 16.53]}
+        }
+      },
+      "contact_transition_f1": {"gripper": 0.6368, "support": 0.6544}
+    },
+    {
+      "id": "M2-event-oversampling",
+      "config": "configs/world_model_v3/event.json",
+      "epochs_per_member": [22, 28, 23],
+      "best_validation_loss_per_member": [0.1204154051, 0.1280575636, 0.1227217264],
+      "package_position_rmse_mm": {
+        "uniform_windows": {
+          "0.5s": {"mean": 4.79, "ci95": [4.32, 5.31]},
+          "2.0s": {"mean": 12.40, "ci95": [11.76, 13.62]}
+        },
+        "event_centered_windows": {
+          "0.5s": {"mean": 10.46, "ci95": [9.15, 12.43]},
+          "2.0s": {"mean": 13.13, "ci95": [12.05, 15.87]}
+        }
+      },
+      "contact_transition_f1": {"gripper": 0.6672, "support": 0.6512}
+    },
+    {
+      "id": "M2-uniform-sampler",
+      "config": "configs/world_model_v3/event_no_oversampling.json",
+      "epochs_per_member": [28, 26, 23],
+      "best_validation_loss_per_member": [0.0929099107, 0.0914639786, 0.0930619207],
+      "package_position_rmse_mm": {
+        "uniform_windows": {
+          "0.5s": {"mean": 3.94, "ci95": [3.52, 4.37]},
+          "2.0s": {"mean": 11.21, "ci95": [10.07, 12.19]}
+        },
+        "event_centered_windows": {
+          "0.5s": {"mean": 14.03, "ci95": [12.49, 16.69]},
+          "2.0s": {"mean": 13.96, "ci95": [13.13, 16.58]}
+        }
+      },
+      "contact_transition_f1": {"gripper": 0.6263, "support": 0.6518}
+    }
+  ],
+  "baselines": {
+    "persistence_package_position_rmse_mm": {
+      "uniform_windows": {"0.5s": 9.36, "2.0s": 24.80},
+      "event_centered_windows": {"0.5s": 35.13, "2.0s": 49.17}
+    },
+    "constant_velocity_package_position_rmse_mm": {
+      "uniform_windows": {"0.5s": 14.69, "2.0s": 75.40},
+      "event_centered_windows": {"0.5s": 31.26, "2.0s": 130.85}
+    }
+  },
+  "interpretation": "Event oversampling improves package-position prediction on event-centered windows, while uniform sampling performs better on uniformly selected windows. Differences come from one seed and 29 validation families; they do not establish a generally superior configuration.",
+  "not_evaluated": [
+    "multi-seed confirmation",
+    "final held-out scenario test",
+    "within-scene action ranking",
+    "online MPC or robot control",
+    "physical robot transfer"
+  ]
+}

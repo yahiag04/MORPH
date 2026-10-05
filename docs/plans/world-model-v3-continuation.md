@@ -1,7 +1,7 @@
 # MORPH World Model V3 — piano di continuazione
 
 **Aggiornato:** 5 ottobre 2026
-**Ultimo commit pubblicato:** `7e5d7d5` — `docs: record event oversampling ablation status`
+**Ultimo commit pubblicato:** `306412f` — `docs: record completed sampler ablation`
 
 Questo file registra lo stato verificato del progetto, l'ordine delle attività rimanenti e i criteri per dichiararlo pronto. Per i contratti tecnici completi consultare [`world-model-v3.md`](world-model-v3.md); questo documento serve a riprendere il lavoro senza rifare attività già concluse.
 

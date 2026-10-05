@@ -16,6 +16,8 @@ Sixteen overhead phone recordings provide hand-motion demonstrations for a table
 
 Evaluation holds out whole source videos: both retargeting variants from one recording always stay in the same outer fold. Across four folds, the model improves end-effector and arm-position prediction over a persistence baseline from 0.5 seconds through the longest shared episode prefix of 11.2 seconds. Package velocity prediction remains weaker than persistence, and at 0.5 and 2.5 seconds package-position persistence is better. The full-episode score does not rank simulated outcomes on this batch: cross-video pairwise accuracy is 50%, and selecting the highest-scored candidate has regret 1.0. All robot outcomes are simulated; no physical robot was evaluated.
 
+A separate V3 development ablation trains actuator-conditioned dynamics on randomized MuJoCo families. On 29 validation families, event oversampling improves package-position prediction around contact transitions, while uniform sampling gives lower error on uniformly selected windows. This comparison uses one training seed and does not establish a universally superior model; V3 action ranking and online control have not been evaluated.
+
 ## Contributions
 
 - A video-grounded pipeline from palm tracking and workspace mapping to Panda contact simulation.
@@ -84,6 +86,47 @@ The preview pairs one recorded overhead attempt with a Panda replay generated fr
 A second experiment uses **240 simulated episodes, 207,670 transitions, and 60 randomized scenario families**. Families are assigned before simulation to train (168 episodes), validation (36), and test (36). This dataset is not part of the 16-video experiment and its scores are not combined with human-demonstration results.
 
 On its held-out scenario families at 25 steps (0.5 seconds), the three-member model improves end-effector position (0.0056 vs. 0.0212 m), arm position (0.0071 vs. 0.0218 rad), and package position (0.0110 vs. 0.0158 m) over persistence. Contact prediction is 96.8% accurate with 96.9% F1. Package velocity remains a difficult target. See [`results/metrics/synthetic_world_model.json`](results/metrics/synthetic_world_model.json) and [`results/figures/synthetic_world_model.png`](results/figures/synthetic_world_model.png).
+
+## V3 development ablation: action-conditioned object dynamics
+
+V3 extends the randomized simulation data with **100 paired counterfactual families and eight interventions per family**. All variants from one initial MuJoCo state stay in the same partition. Combined with the earlier randomized archive, the development split contains 122 training families and 29 validation families (196 validation episodes). The final nine-family partition was not used in this experiment.
+
+Three three-member, actuator-conditioned models were trained with seed 17 on the same split: **M1 expanded** (baseline), **M2 event** (relative state features, grouped multistep loss, and 50% event-window sampling), and **M2 uniform** (the same M2 objective without event oversampling). Each report evaluates both uniformly selected validation windows and windows centered on contact transitions. The table reports trajectory RMSE for package position; intervals are 95% family-cluster bootstrap intervals over 2,000 resamples.
+
+| Model | Uniform 0.5 s (mm) | Uniform 2.0 s (mm) | Contact-centered 0.5 s (mm) | Contact-centered 2.0 s (mm) | Contact-transition F1, gripper / support |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| M1 expanded | 4.20 [3.87, 4.59] | 13.15 [11.79, 14.30] | 13.69 [12.12, 15.87] | 14.10 [12.99, 16.53] | 0.637 / 0.654 |
+| M2 event | 4.79 [4.32, 5.31] | 12.40 [11.76, 13.62] | 10.46 [9.15, 12.43] | 13.13 [12.05, 15.87] | 0.667 / 0.651 |
+| M2 uniform | 3.94 [3.52, 4.37] | 11.21 [10.07, 12.19] | 14.03 [12.49, 16.69] | 13.96 [13.13, 16.58] | 0.626 / 0.652 |
+
+For comparison, persistence gives package-position RMSE of 9.36 mm at 0.5 s and 24.80 mm at 2 s on uniform windows; on contact-centered windows it gives 35.13 and 49.17 mm. M2 event is strongest around contact transitions, while M2 uniform has the lowest average error on uniform windows. **There is no single winner across both evaluation distributions.** Contact-transition F1 uses one-step events matched within 40 ms.
+
+This is a development result from one training seed and 29 validation families, not a multi-seed confirmation. The confidence intervals quantify family variation for these runs; they do not replace independent training seeds. No final held-out test, within-scene action ranking, online MPC, or physical-robot control was evaluated. The qualitative clip above remains a real human attempt beside a conventional MuJoCo Panda replay; it is not video predicted by V3. Full aggregate metrics are in [`world_model_v3_development.json`](results/metrics/world_model_v3_development.json).
+
+### Reproduce the V3 development runs
+
+The transition archives are kept outside the repository. Set these paths to compatible local archives with the same family assignments, and use a Python environment containing PyTorch:
+
+```bash
+CONTACT_DATA=/path/to/contact-expansion-corrected
+COUNTERFACTUAL_DATA=/path/to/counterfactual-development
+RUNS=/path/to/local_world_model_v3_runs
+
+PYTHONPATH=src python scripts/train_world_model_v3.py \
+  --dataset-dir "$CONTACT_DATA" --dataset-dir "$COUNTERFACTUAL_DATA" \
+  --config configs/world_model_v3/m1-expanded.json --seed 17 \
+  --output-dir "$RUNS/M1-expanded-seed17"
+PYTHONPATH=src python scripts/train_world_model_v3.py \
+  --dataset-dir "$CONTACT_DATA" --dataset-dir "$COUNTERFACTUAL_DATA" \
+  --config configs/world_model_v3/event.json --seed 17 \
+  --output-dir "$RUNS/M2-event-seed17"
+PYTHONPATH=src python scripts/train_world_model_v3.py \
+  --dataset-dir "$CONTACT_DATA" --dataset-dir "$COUNTERFACTUAL_DATA" \
+  --config configs/world_model_v3/event_no_oversampling.json --seed 17 \
+  --output-dir "$RUNS/M2-uniform-seed17"
+```
+
+Each run writes `validation.json` and `validation_events.json` beside its local checkpoint and training log. Do not combine these validation scores with the 16-video experiment above.
 
 ## Reproduction
 
