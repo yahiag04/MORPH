@@ -1,7 +1,7 @@
 # MORPH World Model V3 — piano di continuazione
 
 **Aggiornato:** 5 ottobre 2026
-**Ultimo commit pubblicato:** `b1d675c` — `docs: record world model v3 training results`
+**Ultimo commit pubblicato:** `7e5d7d5` — `docs: record event oversampling ablation status`
 
 Questo file registra lo stato verificato del progetto, l'ordine delle attività rimanenti e i criteri per dichiararlo pronto. Per i contratti tecnici completi consultare [`world-model-v3.md`](world-model-v3.md); questo documento serve a riprendere il lavoro senza rifare attività già concluse.
 
@@ -21,7 +21,7 @@ Il risultato riguarda la simulazione e usa lo stato strutturato del simulatore. 
 
 I test V3 sono passati (41 test) e quelli del collector controfattuale sono passati (5 test). Sono inoltre passati CLI help, compilazione Python e `git diff --check`. Non aggiungere pesi/checkpoint, dataset grezzi, video originali o percorsi personali a Git.
 
-### M1 e M2 event completo; ablation M2 uniforme in corso
+### M1, M2 event e M2 uniforme completati
 
 M1, configurazione `configs/world_model_v3/m1-expanded.json`, seed 17, 3 membri, patience 8, CPU, è completo nel run locale `world-model-v3/M1-expanded-seed17-20261004`. Usa lo split train/validation combinato degli archivi corretti; il test non è stato caricato per scegliere il modello.
 
@@ -39,9 +39,19 @@ M2 con oversampling eventi è stato avviato il 5 ottobre 2026, seed 17, sullo st
 
 M2 event è completo: membri terminati dopo `[22,28,23]` epoche; best validation loss `[0.12042,0.12806,0.12272]`. Errore posizione scatola uniforme a 0,1/0,5/1/2 s: `1,34/4,79/7,64/12,40 mm`; centrato sugli eventi: `2,61/10,46/11,66/13,13 mm`. Rispetto a M1, migliora le finestre evento e la previsione a 2 s, con lieve regressione sulle finestre uniformi a 0,5–1 s. F1 eventi a un passo: pinza `0,667`, supporto `0,651`. Sono 29 famiglie di validation: non è ancora una conferma multi-seed.
 
-L'ablation con campionamento uniforme è stata avviata il 5 ottobre, seed 17, configurazione `configs/world_model_v3/event_no_oversampling.json`, output `world-model-v3/M2-uniform-seed17-20261005`. Prima di riprendere, controllare il processo e `status.json`.
+M2 senza oversampling è completo nello stesso split/seed; membri terminati dopo `[28,26,23]` epoche, best validation loss `[0.09291,0.09146,0.09306]`. Errore posizione scatola uniforme a 0,1/0,5/1/2 s: `1,26/3,94/6,44/11,21 mm`; centrato sugli eventi: `3,11/14,03/13,61/13,96 mm`. F1 eventi a un passo: pinza `0,626`, supporto `0,652`.
 
-## Ripresa del run attivo
+Riepilogo comparativo (mm, stesso split e seed 17):
+
+| Modello | Uniforme 0,5 s | Uniforme 2 s | Evento 0,5 s | Evento 2 s | F1 evento pinza/supporto |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| M1 expanded | 4,20 | 13,15 | 13,69 | 14,10 | 0,637 / 0,654 |
+| M2 event oversampling | 4,79 | 12,40 | 10,46 | 13,13 | 0,667 / 0,651 |
+| M2 sampler uniforme | 3,94 | 11,21 | 14,03 | 13,96 | 0,626 / 0,652 |
+
+Nessun singolo modello vince in tutte le condizioni: l'oversampling migliora la previsione centrata sugli eventi, mentre il sampler uniforme è migliore sulle finestre uniformi e sui contatti restano differenze piccole. Sono confronti seed 17 su 29 famiglie validation, non conferme multi-seed. Tutti i report sono locali.
+
+## Stato dei processi e ripresa
 
 Dalla root del worktree, individuare prima gli interpreti e i dati già presenti. I dati restano fuori dal repository:
 
@@ -53,20 +63,12 @@ export MORPH_CONTACT_DATA="$MORPH_DATA_ROOT/contact-expansion-corrected-20261004
 export MORPH_COUNTERFACTUAL_DATA="$MORPH_V3_RUNS/counterfactual-development-compact-20261004"
 
 ps -Ao pid,etime,command | rg 'train_world_model_v3.py'
+cat "$MORPH_V3_RUNS/M1-expanded-seed17-20261004/status.json"
+cat "$MORPH_V3_RUNS/M2-event-seed17-20261005/status.json"
 cat "$MORPH_V3_RUNS/M2-uniform-seed17-20261005/status.json"
 ```
 
-Se l'ablation uniforme è ancora attiva, **non avviarne una copia**. Se è terminata senza `status: complete`, controllare il log e riprendere solo se gli hash del manifest corrispondono:
-
-```bash
-PYTHONPATH=src "$MORPH_TRAIN_PY" scripts/train_world_model_v3.py \
-  --dataset-dir "$MORPH_CONTACT_DATA" \
-  --dataset-dir "$MORPH_COUNTERFACTUAL_DATA" \
-  --config configs/world_model_v3/event_no_oversampling.json \
-  --seed 17 \
-  --output-dir "$MORPH_V3_RUNS/M2-uniform-seed17-20261005" \
-  --resume
-```
+Al completamento dell'ablation non risultavano processi di training V3 attivi. Le tre directory riportano `status: complete`; non rilanciarle. Training aggiuntivi richiedono prima una stima dei tempi e un confronto di priorità.
 
 Il training completo genera `validation.json` (finestre uniformi) e `validation_events.json` (finestre centrate sugli eventi). Salvare fuori da Git i report completi; nei risultati pubblici esportare solo gli aggregati necessari.
 
@@ -74,9 +76,8 @@ Il training completo genera `validation.json` (finestre uniformi) e `validation_
 
 ### 1. Chiudere Task 5: selezione del modello di dinamica
 
-1. Attendere la fine di M1 e registrare durata reale, epoca scelta e report uniform/event.
-2. Allenare `configs/world_model_v3/event.json` (M2 con oversampling eventi), poi `configs/world_model_v3/event_no_oversampling.json` (ablation uniforme), sullo stesso split combinato e seed 17. Usare directory distinte e lo stesso massimo, patience, batch e architettura di M1.
-3. Confrontare almeno posizione/velocità oggetto, orientamento, giunti, F1 di ciascun contatto, F1 degli eventi, coverage e finestre in movimento; separare metriche uniformi da quelle centrate sugli eventi. Non scegliere solo dalla loss complessiva.
+1. M1, M2 event e M2 senza oversampling sono già completi su seed 17 e lo stesso split combinato.
+2. Registrare il trade-off nella tabella sopra e confrontare anche velocità/orientamento/giunti, F1 separati dei contatti, coverage e finestre in movimento; non scegliere dalla sola loss complessiva.
 4. M3 curriculum usa gli orizzonti 25/50/100 per 15/15/10 epoche al massimo. Il pilot già eseguito serviva solo a misurare il costo: 59/112/220 secondi per epoca; non è una prova di convergenza. Avviarlo solo dopo aver stimato il tempo totale. Non superare H=50 nei task successivi se H=100 diverge o non supera le soglie.
 5. Selezionare i due candidati migliori solo su validation. Confermarli con seed 29 e 43, mantenendo lo split; seed 17 è la prima replica. Per isolare l'effetto dei dati, confrontare con M1 allenato sugli stessi dati espansi. Non usare il test storico per scegliere.
 6. Se due esperimenti sulla stessa ipotesi non migliorano le metriche, chiudere la diramazione con esito negativo e seguire la diagnosi nel piano principale (allineamento/unità, baseline dinamiche, parziale osservabilità, copertura eventi, coerenza fisica, modi di contatto).
@@ -133,6 +134,6 @@ Sono obiettivi fissati prima della conferma, non risultati già raggiunti né ga
 
 ## Cosa serve da Yahia
 
-Per proseguire non servono altre riprese, un robot fisico, Colab o spesa cloud: dati e codice necessari alle attività correnti sono già presenti. **L'unica cosa pratica adesso è lasciare il Mac acceso e impedire che vada in stop finché il training M1 in corso non termina.** Se il training viene interrotto, i checkpoint permettono di controllare manifest e riprendere; non serve rifarlo da zero.
+Per proseguire non servono altre riprese, un robot fisico, Colab o spesa cloud: dati e codice necessari alle attività correnti sono già presenti. **Al momento non occorre lasciare il Mac acceso per training: l'ablation richiesta è terminata e non ci sono training V3 attivi.**
 
 L'eventuale uso di risorse cloud o una nuova raccolta di video/dati richiede prima una stima di costo e un motivo sperimentale concreto. Una futura validazione fisica sarà un'estensione distinta e richiederà hardware e misure spaziali calibrate.
