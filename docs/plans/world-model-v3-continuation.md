@@ -1,7 +1,7 @@
 # MORPH World Model V3 — piano di continuazione
 
 **Aggiornato:** 5 ottobre 2026
-**Ultimo commit pubblicato:** `84d4314` — `feat: train contact-aware multistep dynamics`
+**Ultimo commit pubblicato:** `b1d675c` — `docs: record world model v3 training results`
 
 Questo file registra lo stato verificato del progetto, l'ordine delle attività rimanenti e i criteri per dichiararlo pronto. Per i contratti tecnici completi consultare [`world-model-v3.md`](world-model-v3.md); questo documento serve a riprendere il lavoro senza rifare attività già concluse.
 
@@ -21,7 +21,7 @@ Il risultato riguarda la simulazione e usa lo stato strutturato del simulatore. 
 
 I test V3 sono passati (41 test) e quelli del collector controfattuale sono passati (5 test). Sono inoltre passati CLI help, compilazione Python e `git diff --check`. Non aggiungere pesi/checkpoint, dataset grezzi, video originali o percorsi personali a Git.
 
-### M1 completo; M2 in corso
+### M1 e M2 event completo; ablation M2 uniforme in corso
 
 M1, configurazione `configs/world_model_v3/m1-expanded.json`, seed 17, 3 membri, patience 8, CPU, è completo nel run locale `world-model-v3/M1-expanded-seed17-20261004`. Usa lo split train/validation combinato degli archivi corretti; il test non è stato caricato per scegliere il modello.
 
@@ -37,6 +37,10 @@ M1 ha prodotto `validation.json` e `validation_events.json`. RMSE posizione scat
 
 M2 con oversampling eventi è stato avviato il 5 ottobre 2026, seed 17, sullo stesso split, configurazione `configs/world_model_v3/event.json`, output locale `world-model-v3/M2-event-seed17-20261005`. Controllare prima lo stato effettivo e non lanciare duplicati. Le epoche precedenti impiegavano circa 57–60 secondi.
 
+M2 event è completo: membri terminati dopo `[22,28,23]` epoche; best validation loss `[0.12042,0.12806,0.12272]`. Errore posizione scatola uniforme a 0,1/0,5/1/2 s: `1,34/4,79/7,64/12,40 mm`; centrato sugli eventi: `2,61/10,46/11,66/13,13 mm`. Rispetto a M1, migliora le finestre evento e la previsione a 2 s, con lieve regressione sulle finestre uniformi a 0,5–1 s. F1 eventi a un passo: pinza `0,667`, supporto `0,651`. Sono 29 famiglie di validation: non è ancora una conferma multi-seed.
+
+L'ablation con campionamento uniforme è stata avviata il 5 ottobre, seed 17, configurazione `configs/world_model_v3/event_no_oversampling.json`, output `world-model-v3/M2-uniform-seed17-20261005`. Prima di riprendere, controllare il processo e `status.json`.
+
 ## Ripresa del run attivo
 
 Dalla root del worktree, individuare prima gli interpreti e i dati già presenti. I dati restano fuori dal repository:
@@ -49,18 +53,18 @@ export MORPH_CONTACT_DATA="$MORPH_DATA_ROOT/contact-expansion-corrected-20261004
 export MORPH_COUNTERFACTUAL_DATA="$MORPH_V3_RUNS/counterfactual-development-compact-20261004"
 
 ps -Ao pid,etime,command | rg 'train_world_model_v3.py'
-cat "$MORPH_V3_RUNS/M2-event-seed17-20261005/status.json"
+cat "$MORPH_V3_RUNS/M2-uniform-seed17-20261005/status.json"
 ```
 
-Se M2 è ancora attivo, **non avviarne una copia**. Se è terminato senza `status: complete`, controllare il log e riprendere solo se gli hash del manifest corrispondono:
+Se l'ablation uniforme è ancora attiva, **non avviarne una copia**. Se è terminata senza `status: complete`, controllare il log e riprendere solo se gli hash del manifest corrispondono:
 
 ```bash
 PYTHONPATH=src "$MORPH_TRAIN_PY" scripts/train_world_model_v3.py \
   --dataset-dir "$MORPH_CONTACT_DATA" \
   --dataset-dir "$MORPH_COUNTERFACTUAL_DATA" \
-  --config configs/world_model_v3/event.json \
+  --config configs/world_model_v3/event_no_oversampling.json \
   --seed 17 \
-  --output-dir "$MORPH_V3_RUNS/M2-event-seed17-20261005" \
+  --output-dir "$MORPH_V3_RUNS/M2-uniform-seed17-20261005" \
   --resume
 ```
 
